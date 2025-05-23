@@ -1,0 +1,53 @@
+# IDE and editor specific files
+.idea/
+*.swp
+*.swo
+
+# Python virtual environment
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite3
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Secrets and credentials - Be careful not to commit these!
+*.env
+secrets/
+credentials.json
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Test results
+.pytest_cache/
+.tox/
+
+# Specific to this project (if any)
+# e.g., local configuration files not meant for sharing
+# local_settings.py
