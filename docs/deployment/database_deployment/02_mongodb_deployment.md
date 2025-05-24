@@ -360,6 +360,68 @@ db.task_status_cache.createIndex({ "task_type": 1, "status": 1 })
 
 // 设置 TTL 索引，自动清理过期数据
 db.task_status_cache.createIndex({ "last_updated": 1 }, { expireAfterSeconds: 86400 }) // 24 小时后自动删除
+
+### 集合结构详情
+
+#### `system_logs`
+
+用于存储系统各个模块和服务的运行日志。
+
+| 字段名      | 数据类型   | 索引 | 描述                                     |
+| ----------- | ---------- | ---- | ---------------------------------------- |
+| `_id`       | ObjectId   | 自动 | 文档唯一ID                               |
+| `timestamp` | ISODate    | 是   | 日志记录时间                             |
+| `level`     | String     | 是   | 日志级别 (INFO, WARN, ERROR, DEBUG)        |
+| `service`   | String     | 是   | 产生日志的服务或模块名                   |
+| `message`   | String     |      | 日志消息主体                             |
+| `details`   | Object     |      | 附加的结构化日志信息 (例如：用户ID, 请求ID) |
+
+**索引:**
+*   `{ "timestamp": 1 }`
+*   `{ "level": 1, "timestamp": 1 }`
+*   `{ "service": 1, "timestamp": 1 }`
+
+#### `configurations`
+
+用于存储系统组件的配置信息，支持版本化和环境区分。
+
+| 字段名        | 数据类型 | 索引 | 描述                                     |
+| ------------- | -------- | ---- | ---------------------------------------- |
+| `_id`         | ObjectId | 自动 | 文档唯一ID                               |
+| `component`   | String   | 是   | 配置所属的组件名 (例如：data_pipeline, api_gateway) |
+| `environment` | String   | 是   | 配置适用的环境 (例如：development, staging, production) |
+| `version`     | String   | 是   | 配置版本号                               |
+| `config_data` | Object   |      | 具体的配置内容 (JSON格式)                |
+| `is_active`   | Boolean  | 是   | 当前配置是否生效                         |
+| `created_at`  | ISODate  |      | 配置创建时间                             |
+| `updated_at`  | ISODate  |      | 配置最后更新时间                         |
+
+**索引:**
+*   `{ "component": 1, "environment": 1, "version": 1 }` (唯一索引确保组合唯一性)
+*   `{ "is_active": 1 }`
+
+#### `task_status_cache`
+
+用于缓存异步任务的状态，方便快速查询，并利用 TTL 自动清理过期数据。
+
+| 字段名         | 数据类型   | 索引 | 描述                                     |
+| -------------- | ---------- | ---- | ---------------------------------------- |
+| `_id`          | ObjectId   | 自动 | 文档唯一ID                               |
+| `task_id`      | String     | 是   | 任务的唯一标识符                         |
+| `task_type`    | String     | 是   | 任务类型 (例如：data_processing, model_training) |
+| `status`       | String     | 是   | 任务当前状态 (例如：PENDING, RUNNING, COMPLETED, FAILED) |
+| `progress`     | Number     |      | 任务进度 (例如：0-100)                   |
+| `result_url`   | String     |      | 任务结果存储位置 (如果适用)                |
+| `error_message`| String     |      | 任务失败时的错误信息                     |
+| `created_at`   | ISODate    |      | 任务创建时间                             |
+| `last_updated` | ISODate    | 是   | 任务状态最后更新时间 (用于TTL)           |
+
+**索引:**
+*   `{ "task_id": 1 }` (唯一索引)
+*   `{ "status": 1, "last_updated": 1 }`
+*   `{ "task_type": 1, "status": 1 }`
+*   `{ "last_updated": 1 }` (TTL 索引, `expireAfterSeconds: 86400`)
+
 ```
 
 ## 5. 最佳实践

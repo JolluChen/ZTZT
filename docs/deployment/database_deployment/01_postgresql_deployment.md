@@ -501,6 +501,34 @@ INSERT INTO auth.users (username, email, password_hash, is_active, is_superuser)
 VALUES ('admin', 'admin@example.com', '$2b$12$ZvObSUln.TpZ9vOJUPm6mOSnVkB.Zh6qsJWhjWYQOX5fT4QL96lxW', true, true)
 ON CONFLICT (username) DO NOTHING;
 
+### `auth` 模式表结构
+
+#### `auth.users`
+
+| 列名             | 数据类型                  | 约束/描述                                  |
+| ---------------- | ------------------------- | ------------------------------------------ |
+| id               | SERIAL                    | PRIMARY KEY                                |
+| username         | VARCHAR(150)              | UNIQUE, NOT NULL                           |
+| email            | VARCHAR(254)              | UNIQUE, NOT NULL                           |
+| password_hash    | VARCHAR(255)              | NOT NULL                                   |
+| first_name       | VARCHAR(150)              |                                            |
+| last_name        | VARCHAR(150)              |                                            |
+| is_active        | BOOLEAN                   | DEFAULT true                               |
+| is_superuser     | BOOLEAN                   | DEFAULT false                              |
+| date_joined      | TIMESTAMP WITH TIME ZONE  | DEFAULT NOW()                              |
+| last_login       | TIMESTAMP WITH TIME ZONE  |                                            |
+| organization_id  | INTEGER                   |                                            |
+
+#### `auth.groups`
+
+| 列名        | 数据类型     | 约束/描述        |
+| ----------- | ------------ | ---------------- |
+| id          | SERIAL       | PRIMARY KEY      |
+| name        | VARCHAR(150) | UNIQUE, NOT NULL |
+| description | TEXT         |                  |
+
+---
+
 -- 数据平台初始化设置
 CREATE TABLE IF NOT EXISTS data_platform.data_sources (
     id SERIAL PRIMARY KEY,
@@ -514,6 +542,22 @@ CREATE TABLE IF NOT EXISTS data_platform.data_sources (
     is_active BOOLEAN DEFAULT true
 );
 
+### `data_platform` 模式表结构
+
+#### `data_platform.data_sources`
+
+| 列名            | 数据类型                 | 约束/描述                                     |
+| --------------- | ------------------------ | --------------------------------------------- |
+| id              | SERIAL                   | PRIMARY KEY                                   |
+| name            | VARCHAR(200)             | NOT NULL                                      |
+| description     | TEXT                     |                                               |
+| source_type     | VARCHAR(50)              | NOT NULL                                      |
+| connection_info | JSONB                    | NOT NULL                                      |
+| created_by      | INTEGER                  | REFERENCES auth.users(id)                     |
+| created_at      | TIMESTAMP WITH TIME ZONE | DEFAULT NOW()                                 |
+| updated_at      | TIMESTAMP WITH TIME ZONE | DEFAULT NOW()                                 |
+| is_active       | BOOLEAN                  | DEFAULT true                                  |
+
 -- 向量表
 CREATE TABLE IF NOT EXISTS data_platform.text_embeddings (
     id SERIAL PRIMARY KEY,
@@ -524,9 +568,54 @@ CREATE TABLE IF NOT EXISTS data_platform.text_embeddings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+#### `data_platform.text_embeddings`
+
+| 列名         | 数据类型                 | 约束/描述                                     |
+| ------------ | ------------------------ | --------------------------------------------- |
+| id           | SERIAL                   | PRIMARY KEY                                   |
+| dataset_id   | INTEGER                  |                                               |
+| record_id    | VARCHAR(100)             |                                               |
+| text_content | TEXT                     |                                               |
+| embedding    | vector(1536)             | 使用OpenAI ada模型的1536维向量                 |
+| created_at   | TIMESTAMP WITH TIME ZONE | DEFAULT NOW()                                 |
+
 -- 创建向量索引
 CREATE INDEX idx_text_embeddings_vector ON data_platform.text_embeddings 
 USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+### `algo_platform`, `model_platform`, `service_platform` 模式表结构
+
+这些模式的表结构将根据 `05_database_setup_new.md` 中定义的实体和关系进行创建。请参考该文档中的 "表结构和关系" 部分获取高级概述，并在后续的开发迭代中，在此处补充详细的 DDL 和 Markdown 表格。
+
+**示例 (algo_platform.algorithms):**
+
+```sql
+-- algo_platform 模式下的表结构 (示例)
+CREATE TABLE IF NOT EXISTS algo_platform.algorithms (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    version VARCHAR(50),
+    source_code_url VARCHAR(512),
+    created_by INTEGER REFERENCES auth.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (name, version)
+);
+```
+
+| 列名            | 数据类型                 | 约束/描述                                     |
+| --------------- | ------------------------ | --------------------------------------------- |
+| id              | SERIAL                   | PRIMARY KEY                                   |
+| name            | VARCHAR(255)             | NOT NULL                                      |
+| description     | TEXT                     |                                               |
+| version         | VARCHAR(50)              |                                               |
+| source_code_url | VARCHAR(512)             |                                               |
+| created_by      | INTEGER                  | REFERENCES auth.users(id)                     |
+| created_at      | TIMESTAMP WITH TIME ZONE | DEFAULT NOW()                                 |
+| updated_at      | TIMESTAMP WITH TIME ZONE | DEFAULT NOW()                                 |
+|                 |                          | UNIQUE (name, version)                        |
+
 EOF
 
 # 在Docker环境执行初始化脚本
