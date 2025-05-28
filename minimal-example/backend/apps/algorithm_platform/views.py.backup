@@ -1,0 +1,293 @@
+import uuid
+from datetime import datetime
+from django.utils import timezone
+from django.db import models
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+from .models import AlgorithmProject, Experiment, ExperimentRun, Algorithm
+from .serializers import (
+    AlgorithmProjectSerializer, ExperimentSerializer, ExperimentRunSerializer,
+    AlgorithmSerializer, ExperimentCreateSerializer
+)
+
+
+class AlgorithmProjectViewSet(viewsets.ModelViewSet):
+    """算法项目ViewSet"""
+    queryset = AlgorithmProject.objects.all()
+    serializer_class = AlgorithmProjectSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['framework', 'is_active']
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'updated_at', 'name']    def get_queryset(self):
+        """只返回当前用户组织的项目"""
+        return AlgorithmProject.objects.filter(
+            organization=self.request.user.profile.organization
+        )    def perform_create(self, serializer):
+        """创建项目时设置组织和创建�?""
+        serializer.save(
+            organization=self.request.user.profile.organization,
+            created_by=self.request.user
+        )
+
+    @action(detail=True, methods=['get'])
+    def experiments(self, request, pk=None):
+        """获取项目下的所有实�?""
+        project = self.get_object()
+        experiments = project.experiments.all()
+        serializer = ExperimentSerializer(experiments, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def clone(self, request, pk=None):
+        """克隆项目"""
+        original_project = self.get_object()
+        new_name = request.data.get('name', f"{original_project.name}_copy")
+        
+        # 创建新项�?
+        new_project = AlgorithmProject.objects.create(
+            name=new_name,
+            description=f"克隆�? {original_project.name}",
+            organization=self.request.user.profile.organization,
+            created_by=self.request.user,
+            framework=original_project.framework,
+            environment_config=original_project.environment_config,
+            git_repository=original_project.git_repository
+        )
+        
+        serializer = self.get_serializer(new_project)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ExperimentViewSet(viewsets.ModelViewSet):
+    """实验ViewSet"""
+    queryset = Experiment.objects.all()
+    serializer_class = ExperimentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['project', 'algorithm_type', 'status', 'dataset']
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'updated_at', 'started_at', 'completed_at']
+
+    def get_queryset(self):
+        """只返回当前用户组织的实验"""
+        return Experiment.objects.filter(
+            project__organization=self.request.user.profile.organization
+        )
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ExperimentCreateSerializer
+        return ExperimentSerializer
+
+    def perform_create(self, serializer):
+        """创建实验时设置创建�?""
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def start(self, request, pk=None):
+        """启动实验"""
+        experiment = self.get_object()
+        
+        if experiment.status != 'created':
+            return Response({
+                'error': '只能启动已创建状态的实验'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 更新实验状�?
+        experiment.status = 'running'
+        experiment.started_at = timezone.now()
+        experiment.save()
+        
+        # 创建实验运行记录
+        run = ExperimentRun.objects.create(
+            experiment=experiment,
+            run_id=str(uuid.uuid4()),
+            version=experiment.runs.count() + 1,
+            parameters=experiment.hyperparameters,
+            status='running',
+            started_at=timezone.now()
+        )
+        
+        # 这里可以实现具体的实验执行逻辑
+        # 目前返回模拟结果
+        
+        return Response({
+            'message': f'实验 {experiment.name} 已启�?,
+            'run_id': run.run_id
+        })
+
+    @action(detail=True, methods=['post'])
+    def stop(self, request, pk=None):
+        """停止实验"""
+        experiment = self.get_object()
+        
+        if experiment.status != 'running':
+            return Response({
+                'error': '只能停止运行中的实验'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        experiment.status = 'stopped'
+        experiment.save()
+        
+        # 停止最新的运行记录
+        latest_run = experiment.runs.filter(status='running').first()
+        if latest_run:
+            latest_run.status = 'killed'
+            latest_run.ended_at = timezone.now()
+            latest_run.save()
+        
+        return Response({
+            'message': f'实验 {experiment.name} 已停�?
+        })
+
+    @action(detail=True, methods=['get'])
+    def runs(self, request, pk=None):
+        """获取实验的所有运行记�?""
+        experiment = self.get_object()
+        runs = experiment.runs.all()
+        serializer = ExperimentRunSerializer(runs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def metrics(self, request, pk=None):
+        """获取实验的评估指标历�?""
+        experiment = self.get_object()
+        runs = experiment.runs.filter(status='completed').order_by('version')
+        
+        metrics_history = []
+        for run in runs:
+            if run.metrics:
+                metrics_data = {
+                    'version': run.version,
+                    'run_id': run.run_id,
+                    'started_at': run.started_at,
+                    'metrics': run.metrics
+                }
+                metrics_history.append(metrics_data)
+        
+        return Response({'metrics_history': metrics_history})
+
+
+class ExperimentRunViewSet(viewsets.ModelViewSet):
+    """实验运行记录ViewSet"""
+    queryset = ExperimentRun.objects.all()
+    serializer_class = ExperimentRunSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['experiment', 'status', 'version']
+    search_fields = ['run_id']
+    ordering_fields = ['created_at', 'started_at', 'ended_at', 'version']
+
+    def get_queryset(self):
+        """只返回当前用户组织的运行记录"""
+        return ExperimentRun.objects.filter(
+            experiment__project__organization=self.request.user.profile.organization
+        )
+
+    @action(detail=True, methods=['get'])
+    def logs(self, request, pk=None):
+        """获取运行日志"""
+        run = self.get_object()
+        # 这里可以实现从日志文件或日志系统读取日志
+        logs = run.logs or "暂无日志记录"
+        return Response({'logs': logs})
+
+    @action(detail=True, methods=['get'])
+    def artifacts(self, request, pk=None):
+        """获取运行产出文件"""
+        run = self.get_object()
+        return Response({'artifacts': run.artifacts})
+
+    @action(detail=True, methods=['post'])
+    def compare(self, request, pk=None):
+        """比较多个运行结果"""
+        run = self.get_object()
+        compare_run_ids = request.data.get('compare_with', [])
+        
+        comparison_data = {
+            'base_run': {
+                'run_id': run.run_id,
+                'version': run.version,
+                'metrics': run.metrics,
+                'parameters': run.parameters
+            },
+            'compared_runs': []
+        }
+        
+        for run_id in compare_run_ids:
+            try:
+                compare_run = ExperimentRun.objects.get(run_id=run_id)
+                comparison_data['compared_runs'].append({
+                    'run_id': compare_run.run_id,
+                    'version': compare_run.version,
+                    'metrics': compare_run.metrics,
+                    'parameters': compare_run.parameters
+                })
+            except ExperimentRun.DoesNotExist:
+                continue
+        
+        return Response(comparison_data)
+
+
+class AlgorithmViewSet(viewsets.ModelViewSet):
+    """算法模板ViewSet"""
+    queryset = Algorithm.objects.all()
+    serializer_class = AlgorithmSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['category', 'framework', 'is_builtin', 'is_active']
+    search_fields = ['name', 'description', 'author']
+    ordering_fields = ['created_at', 'updated_at', 'name', 'version']
+
+    def get_queryset(self):
+        """返回内置算法和当前用户组织的自定义算�?""
+        user_org = self.request.user.profile.organization
+        return Algorithm.objects.filter(
+            models.Q(is_builtin=True) | models.Q(organization=user_org)
+        )
+
+    def perform_create(self, serializer):
+        """创建算法时设置组�?""
+        serializer.save(
+            organization=self.request.user.profile.organization,
+            is_builtin=False
+        )
+
+    @action(detail=True, methods=['get'])
+    def template(self, request, pk=None):
+        """获取算法代码模板"""
+        algorithm = self.get_object()
+        return Response({
+            'name': algorithm.name,
+            'code_template': algorithm.code_template,
+            'default_parameters': algorithm.default_parameters,
+            'framework': algorithm.framework
+        })
+
+    @action(detail=True, methods=['post'])
+    def clone(self, request, pk=None):
+        """克隆算法模板"""
+        original_algorithm = self.get_object()
+        new_name = request.data.get('name', f"{original_algorithm.name}_copy")
+        
+        new_algorithm = Algorithm.objects.create(
+            name=new_name,
+            description=f"克隆�? {original_algorithm.name}",
+            category=original_algorithm.category,
+            framework=original_algorithm.framework,
+            code_template=original_algorithm.code_template,
+            default_parameters=original_algorithm.default_parameters,
+            author=self.request.user.username,
+            version="1.0.0",
+            is_builtin=False,
+            organization=self.request.user.profile.organization
+        )
+        
+        serializer = self.get_serializer(new_algorithm)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
