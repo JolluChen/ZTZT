@@ -30,17 +30,17 @@
 - **CPU**: 高性能多核处理器
 - **内存**: 128GB DDR4/DDR5
 - **显卡**: 5×RTX 2080Ti (55GB总显存)
-- **存储**: 3×1TB NVMe SSD (系统盘+RAID0数据存储)
+- **存储**: 3×1TB SATA SSD (系统盘+RAID0数据存储)
 - **网络**: 千兆以上网络接口
 
 #### 存储架构设计
 ```
 ┌─────────────────┬─────────────────┬─────────────────┐
-│   SSD 1 (1TB)   │   SSD 2 (1TB)   │   SSD 3 (1TB)   │
+│  /dev/sda (1TB) │ /dev/sdb (1TB)  │ /dev/sdc (1TB)  │
 │   系统盘        │                 │                 │
 │  Ubuntu 24.04   │    RAID 0       │    RAID 0       │
 │   /boot: 1GB    │   数据存储       │   数据存储       │
-│   /: ~999GB     │   /data: 2TB    │   /data: 2TB    │
+│   /: ~999GB     │   /data: ~2TB   │   /data: ~2TB   │
 └─────────────────┴─────────────────┴─────────────────┘
 ```
 
@@ -104,45 +104,44 @@
                 *   **RAID 10 (RAID 1+0)**: 至少需要4个磁盘（偶数个）。先将磁盘两两组成 RAID 1 镜像对，然后再将这些镜像对组成 RAID 0 条带。兼具 RAID 0 的高性能和 RAID 1 的高可靠性。允许每个镜像对中的一个磁盘发生故障。磁盘利用率为50%。成本较高。
             *   **选择 RAID 级别的考虑因素**: 性能需求、数据重要性、预算、可用磁盘数量。
             *   **配置方法**: 通常在服务器启动时按特定键 (如 Ctrl+R, Ctrl+M, F8 等，具体请参考服务器或 RAID 卡手册) 进入 RAID 配置工具。在该工具中，您可以选择物理磁盘来创建逻辑驱动器 (Virtual Disk) 并指定 RAID 级别、条带大小等参数。
-            *   **注意**: 创建 RAID 后，操作系统安装程序会将此 RAID 卷视为一个单独的磁盘进行后续分区。        *   **高性能AI工作站分区方案 (RAID 0)**: 
+            *   **注意**: 创建 RAID 后，操作系统安装程序会将此 RAID 卷视为一个单独的磁盘进行后续分区。        *   **AI中台生产环境分区方案 (RAID 0 + 系统盘)**: 
             *   在 Ubuntu 安装程序的存储配置步骤，选择 **Custom storage layout** (自定义存储布局)。
-            *   **系统盘 (SSD 1)**: `/dev/nvme0n1` - 1TB NVMe SSD
-            *   **数据存储 RAID 0 (SSD 2 + SSD 3)**: `/dev/nvme1n1` + `/dev/nvme2n1` - 2TB 总容量
+            *   **系统盘 (SATA SSD)**: `/dev/sda` - 1TB SATA SSD (安装系统)
+            *   **数据存储 RAID 0 (SATA SSD x2)**: `/dev/sdb` + `/dev/sdc` - ~2TB 总容量
             
-        *   **RAID 0 数据存储配置**:
+        *   **实际磁盘配置方案**:
             ```bash
-            # 在Ubuntu安装过程中，您将看到3块NVMe SSD
-            # /dev/nvme0n1 (1TB) - 系统盘
-            # /dev/nvme1n1 (1TB) - 数据存储 RAID 0 成员1
-            # /dev/nvme2n1 (1TB) - 数据存储 RAID 0 成员2
+            # 当前磁盘配置 
+            # /dev/sda (1TB) - 系统盘，用于Ubuntu安装
+            # /dev/sdb (1TB) - 数据存储 RAID 0 成员1 (安装后配置)
+            # /dev/sdc (1TB) - 数据存储 RAID 0 成员2 (安装后配置)
             ```
             
-            1.  **系统盘分区 (`/dev/nvme0n1`)**:
+            1.  **系统盘分区 (`/dev/sda`)** - 安装时配置:
                 *   **`/boot/efi`**: 512MB (EFI系统分区, FAT32)
-                *   **`/boot`**: 1GB (启动分区, ext4)  
+                *   **`/boot`**: 1GB (启动分区, ext4)
                 *   **根分区 (`/`)**: ~998GB (根文件系统, ext4)
-                *   **注意**: 不使用LVM，采用直接分区方式确保最佳性能
+                *   **注意**: 简化分区策略，便于管理和维护
                 
-            2.  **RAID 0 数据存储 (安装后配置)**:
-                *   在Ubuntu安装程序中，暂时不配置SSD 2和SSD 3
-                *   系统安装完成后，通过软件RAID创建RAID 0阵列
-                *   挂载点: `/data` (2TB RAID 0阵列)
-                
-        *   **分区大小配置 (高性能AI工作站)**:
+            2.  **RAID 0 数据存储 (系统安装后配置)**:
+                *   使用软件RAID创建RAID 0阵列 (`/dev/md0`)
+                *   源设备: `/dev/sdb` + `/dev/sdc`
+                *   挂载点: `/data` (~2TB RAID 0阵列，用于AI模型和数据存储)
+                *   配置脚本: `setup_raid0_sdb_sdc.sh` (一键自动配置)
+                  *   **分区大小配置 (AI工作站 - SATA SSD)**:
             ```
-            系统盘 (/dev/nvme0n1 - 1TB):
+            系统盘 (/dev/sda - 1TB):
             ├── /boot/efi: 512MB (FAT32, EFI系统分区)
             ├── /boot: 1GB (ext4, 启动分区)
             └── /: ~998GB (ext4, 根文件系统)
             
             数据存储 (RAID 0 - 2TB):
-            └── /data: 2TB (ext4, AI模型和数据存储)
+            └── /data: ~2TB (ext4, AI模型和数据存储)
             ```
-            
-        *   **性能优化配置**:
+              *   **性能优化配置**:
             *   **文件系统**: 使用ext4，启用`noatime`和`data=writeback`选项
-            *   **I/O调度器**: 设置为`mq-deadline`以优化NVMe性能
-            *   **RAID条带大小**: 64KB (优化AI工作负载的大文件读写)
+            *   **I/O调度器**: 设置为`mq-deadline`以优化SATA SSD性能
+            *   **RAID条带大小**: 128KB (优化AI工作负载的大文件读写)
             *   **文件系统块大小**: 4KB (平衡性能和空间效率)
         *   **确认并写入更改**: 在 Ubuntu 安装程序中完成分区设置后，确认更改并继续安装。
     *   **配置文件设置**: 
@@ -185,18 +184,20 @@
 
 ### 2.0 RAID 0高速数据存储配置
 
-> **🎯 配置目标**: 将两块1TB NVMe SSD配置为RAID 0阵列，提供2TB高速数据存储
-> - **系统盘**: `/dev/nvme0n1` (1TB, 已安装Ubuntu)  
-> - **数据存储**: `/dev/nvme1n1` + `/dev/nvme2n1` → `/dev/md0` (2TB RAID 0)
+> **🎯 配置目标**: 将两块1TB SATA SSD配置为RAID 0阵列，提供~2TB高速数据存储
+> - **系统盘**: `/dev/sda` (1TB, 已安装Ubuntu)  
+> - **数据存储**: `/dev/sdb` + `/dev/sdc` → `/dev/md0` (~2TB RAID 0)
 > - **挂载点**: `/data` (AI模型和数据存储)
-> - **预期性能**: 6000-7000 MB/s读写速度
+> - **预期性能**: 1000-1200 MB/s读写速度 (SATA限制)
 > - **总配置时间**: 10-15分钟 (95%自动化)
 
 #### ⚡ 方法一：一键自动配置 (推荐)
 
-可以选择以下任意一种方式进行配置：
-
-**选项1: 本地脚本配置**
+**选项1: 使用专用脚本**
+```bash
+# 运行针对sda/sdb/sdc配置的专用脚本
+sudo bash docs/deployment/01_environment_deployment/setup_raid0_sdb_sdc.sh
+```
 ```bash
 # 创建并运行自动配置脚本
 sudo tee /usr/local/bin/setup-raid0.sh << 'EOF'
@@ -353,48 +354,49 @@ curl -fsSL https://raw.githubusercontent.com/your-repo/quick-raid-setup.sh | sud
 ```bash
 # 1. 安装必要工具
 sudo apt update
-sudo apt install -y mdadm parted smartmontools nvme-cli
+sudo apt install -y mdadm parted smartmontools hdparm
 
-# 2. 检查磁盘
-sudo fdisk -l | grep nvme
-sudo lsblk -d -o NAME,SIZE,MODEL | grep nvme
+# 2. 检查磁盘 (确认sda为系统盘，sdb/sdc为数据盘)
+sudo fdisk -l | grep -E "(sda|sdb|sdc)"
+sudo lsblk -d -o NAME,SIZE,MODEL | grep -E "(sda|sdb|sdc)"
 
 # 3. 磁盘健康检查
-sudo smartctl -H /dev/nvme1n1
-sudo smartctl -H /dev/nvme2n1
+sudo smartctl -H /dev/sdb
+sudo smartctl -H /dev/sdc
 
-# 4. 清理磁盘 (⚠️ 会删除所有数据)
-sudo wipefs -a /dev/nvme1n1 /dev/nvme2n1
-sudo sgdisk --zap-all /dev/nvme1n1 /dev/nvme2n1
+# 4. 清理数据盘 (⚠️ 会删除sdb和sdc上的所有数据)
+sudo wipefs -a /dev/sdb /dev/sdc
+sudo sgdisk --zap-all /dev/sdb /dev/sdc
 
-# 5. 创建RAID 0
+# 5. 创建RAID 0 (sdb + sdc整盘模式)
 sudo mdadm --create --verbose /dev/md0 \
     --level=0 \
     --raid-devices=2 \
-    --chunk=64 \
+    --chunk=128 \
     --metadata=1.2 \
-    /dev/nvme1n1 /dev/nvme2n1
+    /dev/sdb /dev/sdc
 
 # 6. 创建文件系统
-sudo mkfs.ext4 -F -L "AI-DATA" \
+sudo mkfs.ext4 -F -L "AI-DATA-RAID0" \
     -O ^has_journal,large_file,extent,flex_bg \
-    -E stride=16,stripe-width=32,lazy_itable_init=0 \
+    -E stride=32,stripe-width=64,lazy_itable_init=0 \
     -m 1 \
     /dev/md0
 
 # 7. 挂载配置
 sudo mkdir -p /data
 UUID=$(sudo blkid -s UUID -o value /dev/md0)
-echo "UUID=${UUID} /data ext4 defaults,noatime,data=writeback,barrier=0 0 2" | sudo tee -a /etc/fstab
+echo "UUID=${UUID} /data ext4 defaults,noatime,data=writeback,barrier=0,stripe=64 0 2" | sudo tee -a /etc/fstab
 sudo mount /data
 
-# 8. 创建目录结构
-sudo mkdir -p /data/{cache,tmp,models,datasets,outputs,logs}
-sudo mkdir -p /data/cache/{torch,tensorflow,huggingface,conda}
+# 8. 创建AI数据目录结构
+sudo mkdir -p /data/{models,datasets,cache,tmp,outputs,logs,workspace}
+sudo mkdir -p /data/cache/{torch,tensorflow,huggingface,conda,pip}
 sudo chown -R $USER:$USER /data
 
-# 9. 保存配置
+# 9. 保存RAID配置
 sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
+sudo update-initramfs -u
 sudo update-initramfs -u
 ```
 
@@ -450,20 +452,20 @@ sudo mount /dev/md0 /data
 1. **磁盘未检测到**
 ```bash
 # 检查物理连接
-sudo fdisk -l | grep nvme
-lsblk
-# 检查BIOS/UEFI设置，确保NVMe控制器已启用
+sudo fdisk -l | grep -E "(sda|sdb|sdc)"
+lsblk | grep -E "(sda|sdb|sdc)"
+# 检查BIOS/UEFI设置，确保SATA控制器已启用
 ```
 
 2. **RAID创建失败**
 ```bash
 # 检查磁盘状态
-sudo smartctl -a /dev/nvme1n1
-sudo smartctl -a /dev/nvme2n1
+sudo smartctl -a /dev/sdb
+sudo smartctl -a /dev/sdc
 
 # 手动清除磁盘
-sudo wipefs -a /dev/nvme1n1 /dev/nvme2n1
-sudo sgdisk --zap-all /dev/nvme1n1 /dev/nvme2n1
+sudo wipefs -a /dev/sdb /dev/sdc
+sudo sgdisk --zap-all /dev/sdb /dev/sdc
 ```
 
 3. **挂载失败**
@@ -487,10 +489,16 @@ sudo mdadm --stop /dev/md0
 sudo nano /etc/fstab  # 删除相关行
 
 # 清除磁盘 (如果需要重新开始)
-sudo wipefs -a /dev/nvme1n1 /dev/nvme2n1
+sudo wipefs -a /dev/sdb /dev/sdc
 ```
 
 #### 📈 性能优化建议
+
+**预期性能指标 (SATA SSD RAID 0):**
+- **顺序读取**: 1000-1200 MB/s
+- **顺序写入**: 900-1100 MB/s
+- **随机4K读取**: 90,000-110,000 IOPS
+- **随机4K写入**: 80,000-100,000 IOPS
 
 **AI框架缓存优化:**
 ```bash
