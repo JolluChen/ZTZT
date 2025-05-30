@@ -1616,7 +1616,7 @@ urlpatterns = [
 ## 📋 最终部署检查清单
 
 ### 1. 基础环境检查
-- [ ] Python 3.8+ 已安装
+- [ ] Python 3.8 已安装
 - [ ] Redis 服务运行正常
 - [ ] PostgreSQL/MySQL 数据库运行正常
 - [ ] 必要的Python包已安装（见requirements.txt）

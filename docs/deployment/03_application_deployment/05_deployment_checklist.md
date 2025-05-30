@@ -42,7 +42,7 @@ which git curl wget nano htop
 ### 第二阶段：服务器部署检查 ✅
 
 #### 2.1 PostgreSQL 数据库
-- [ ] PostgreSQL 14+ 已安装
+- [ ] PostgreSQL 16 已安装
 - [ ] 数据库服务正在运行
 - [ ] ai_platform 数据库已创建
 - [ ] 数据库用户已配置
@@ -89,7 +89,7 @@ sudo nginx -t
 ```
 
 #### 2.4 Python 环境
-- [ ] Python 3.10+ 已安装
+- [ ] Python 3.10 已安装
 - [ ] pip 包管理器最新版本
 - [ ] 虚拟环境已创建
 - [ ] 所需Python包已安装
@@ -359,7 +359,7 @@ echo "=" * 50
 
 # 系统基础检查
 echo "📋 系统基础检查"
-check_command "Python 3.10+" "python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)'"
+check_command "Python 3.10" "python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)'"
 check_command "pip 可用" "pip3 --version"
 check_command "Git 可用" "git --version"
 

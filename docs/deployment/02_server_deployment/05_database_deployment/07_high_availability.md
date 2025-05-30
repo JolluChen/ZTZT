@@ -142,7 +142,7 @@ pg_basebackup -h primary_server -D /var/lib/postgresql/16/main -U replicator -P 
 4. **从节点恢复配置**：
 
 ```
-# recovery.conf (PostgreSQL 12前) 或 postgresql.auto.conf (PostgreSQL 12+)
+# recovery.conf (PostgreSQL 12前) 或 postgresql.auto.conf (PostgreSQL 12及以上)
 primary_conninfo = 'host=primary_server port=5432 user=replicator password=strong_password application_name=standby1'
 primary_slot_name = 'replica_slot_name'
 recovery_target_timeline = 'latest'

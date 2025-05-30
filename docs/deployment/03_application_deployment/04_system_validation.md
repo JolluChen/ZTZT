@@ -95,7 +95,7 @@ class EnvironmentValidator:
             self.log_test(
                 "Python版本检查", 
                 False, 
-                f"需要Python 3.10+，当前: {version.major}.{version.minor}"
+                f"需要Python 3.10，当前: {version.major}.{version.minor}"
             )
     
     def check_system_resources(self):

@@ -15,7 +15,7 @@
 - ✅ Ubuntu 24.04 LTS Server 基础系统
 - ✅ 系统安全配置和加固
 - ✅ 网络和防火墙设置
-- ✅ Python 3.10+ 开发环境
+- ✅ Python 3.10 开发环境
 - ✅ GPU驱动和CUDA环境 (RTX 2080Ti × 5)
 - ✅ 系统监控和日志配置
 
@@ -609,9 +609,9 @@ vim --version
 git --version
 ```
 
-## 3. Python 3.10+ 开发环境配置
+## 3. Python 3.10 开发环境配置
 
-Ubuntu 24.04 LTS默认包含Python 3.12，但AI平台需要确保Python 3.10+的兼容性：
+Ubuntu 24.04 LTS默认包含Python 3.12，但AI平台需要确保Python 3.10的兼容性：
 
 ### 3.1 Python环境安装
 

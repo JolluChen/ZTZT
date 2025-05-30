@@ -40,8 +40,8 @@ AI 中台的权限管理系统是一个多层次、多维度的安全体系，�
 | 层级 | 组件 | 技术选型 | 部署状态 | 详细文档 |
 |------|------|----------|----------|----------|
 | **身份认证** | 用户认证 | Django 4.2 + 扩展模型 | ✅ 本系列部署 | [Django认证部署](./02_django_authentication.md) |
-| **令牌管理** | JWT 认证 | DRF-SimpleJWT 5.3+ | ✅ 本系列部署 | [JWT配置指南](./03_jwt_configuration.md) |
-| **权限控制** | 对象级权限 | Django-Guardian 2.4+ | ✅ 本系列部署 | [对象权限实现](./04_object_permissions.md) |
+| **令牌管理** | JWT 认证 | DRF-SimpleJWT 5.3 | ✅ 本系列部署 | [JWT配置指南](./03_jwt_configuration.md) |
+| **权限控制** | 对象级权限 | Django-Guardian 2.4 | ✅ 本系列部署 | [对象权限实现](./04_object_permissions.md) |
 | **角色管理** | RBAC 模型 | 自定义Django模型 | ✅ 本系列部署 | [RBAC实现](./05_rbac_implementation.md) |
 | **安全防护** | 安全中间件 | Django + 自定义中间件 | ✅ 本系列部署 | [安全加固](./06_security_hardening.md) |
 | **监控审计** | 审计系统 | Django日志 + 自定义 | ✅ 本系列部署 | [监控审计](./07_monitoring_audit.md) |

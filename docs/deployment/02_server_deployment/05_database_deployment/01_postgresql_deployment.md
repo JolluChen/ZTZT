@@ -14,7 +14,7 @@
 | 组件 | 版本 | 用途 | 部署时间 |
 |------|------|------|----------|
 | PostgreSQL | 16.x | 主数据库 | 45-60分钟 |
-| pgvector | 0.7.0+ | 向量存储 | 15-20分钟 |
+| pgvector | 0.7.0 | 向量存储 | 15-20分钟 |
 | 配置优化 | - | 性能调优 | 20-30分钟 |
 | 安全配置 | - | 访问控制 | 15-25分钟 |
 
@@ -877,7 +877,7 @@ sudo mkdir -p /opt/ai-platform/scripts/database
 sudo tee /opt/ai-platform/scripts/database/01_init_schemas.sql > /dev/null << 'EOF'
 -- AI 中台数据库初始化脚本
 -- 版本: 2024.1
--- 兼容: PostgreSQL 16.x + pgvector 0.7.0+
+-- 兼容: PostgreSQL 16.x + pgvector 0.7.0
 
 -- 启用必要的扩展
 CREATE EXTENSION IF NOT EXISTS vector;

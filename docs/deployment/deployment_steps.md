@@ -10,7 +10,7 @@
     *   更新系统软件包至最新版本。
 
 2.  **容器化平台搭建 (参照 `docs/deployment/01_environment_deployment/01_container_platform_setup.md`)**
-    *   安装 Docker Engine (推荐 25.0.6+)。
+    *   安装 Docker Engine (推荐 25.0.6)。
     *   配置 Docker，启用 BuildKit 和 Containerd。
     *   安装 Kubernetes (推荐 1.28.8)，可以选择 `kubeadm`、`k3s` 或其他发行版。
     *   如果 Kubernetes 不直接使用 Containerd 作为 CRI，则安装和配置 CRI-Dockerd (0.2.x)。
