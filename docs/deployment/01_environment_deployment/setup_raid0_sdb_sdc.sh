@@ -181,7 +181,7 @@ create_filesystem() {
     mkfs.ext4 -F \
         -b 4096 \
         -E stride=16,stripe-width=32 \
-        -L "AI-DATA-RAID0" \
+        -L "ZT-DATA-RAID0" \
         /dev/md0
     
     log_success "文件系统创建完成"

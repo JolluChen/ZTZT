@@ -270,7 +270,7 @@ sleep 5
 
 # 9. 创建优化的ext4文件系统
 echo "创建优化的ext4文件系统..."
-mkfs.ext4 -F -L "AI-DATA" \
+mkfs.ext4 -F -L "ZT-DATA" \
     -O ^has_journal,large_file,extent,flex_bg \
     -E stride=16,stripe-width=32,lazy_itable_init=0 \
     -m 1 \
@@ -377,7 +377,7 @@ sudo mdadm --create --verbose /dev/md0 \
     /dev/sdb /dev/sdc
 
 # 6. 创建文件系统
-sudo mkfs.ext4 -F -L "AI-DATA-RAID0" \
+sudo mkfs.ext4 -F -L "ZT-DATA-RAID0" \
     -O ^has_journal,large_file,extent,flex_bg \
     -E stride=32,stripe-width=64,lazy_itable_init=0 \
     -m 1 \
