@@ -1,203 +1,273 @@
-# AI 中台 - 容器化平台部署
+# ⭐ AI中台 - 容器化平台部署
 
 本文档指导如何部署和配置 AI 中台所需的容器化平台，包括 Docker 和 Kubernetes。
 
-## 2. 容器化平台
+> **📋 前置条件**: 在开始容器化平台部署之前，请确保已完成：
+> - ✅ [操作系统安装与基础配置](./00_os_installation_ubuntu.md) - Ubuntu 24.04 LTS基础环境
+> - ✅ 系统已完成基础工具安装和安全配置
+> - ✅ Python 3.10 和 Node.js 环境已就绪
 
-### 2.1. Docker (Container Runtime)
+## ⏱️ 预计部署时间
+- **Docker Engine 安装**: 15-30分钟  
+- **Kubernetes 安装**: 30-45分钟
+- **环境验证和测试**: 15-30分钟
+- **总计**: 1-1.5小时
 
-**版本**: Docker Engine 25.0.6+
+## 🎯 部署目标
+✅ Docker Engine 25.0.6+ 容器运行时  
+✅ Docker Compose 容器编排  
+✅ Kubernetes 1.28.8 集群环境  
+✅ 容器网络和存储配置  
+✅ 容器化平台监控
 
-**注意**:
-- 确保启用 BuildKit 和 Containerd。
-- **重要**: 在生产环境或商业用途中，请使用 Docker Engine (通常通过 `apt` 安装的 `docker-ce` 包)，避免使用 Docker Desktop 以规避潜在的商业许可问题。
+## 1. 容器化平台概述
 
-**安装步骤:**
+AI中台采用现代化的容器技术栈：
+- **Docker Engine**: 作为容器运行时，支持应用容器化
+- **Docker Compose**: 用于本地开发和简单部署场景
+- **Kubernetes**: 用于生产环境的容器编排和管理
+
+## 2. Docker Engine 部署
+
+### 2.1 Docker Engine 安装
+
+**目标版本**: Docker Engine 25.0.6+
+
+**重要说明**:
+- 确保启用 BuildKit 和 Containerd
+- 生产环境使用 Docker Engine (避免 Docker Desktop 的商业许可问题)
+- 配置适合 Kubernetes 的 cgroup driver
+
+#### 2.1.1 卸载旧版本和安装依赖
+
 ```bash
-# 1. 卸载旧版本 (如果存在)
+# 卸载可能存在的旧版本Docker
 sudo apt-get remove docker docker-engine docker.io containerd runc
-# 2. 设置 Docker 的 APT 仓库
+
+# 更新系统并安装依赖
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
+```
+
+#### 2.1.2 配置Docker官方仓库
+
+```bash
+# 创建keyrings目录
 sudo install -m 0755 -d /etc/apt/keyrings
+
+# 下载并安装Docker官方GPG密钥
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# 添加Docker官方APT源
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 更新包索引
 sudo apt-get update
-# 3. 安装 Docker Engine, CLI, Containerd, 和 Docker Compose
-#   (确保安装的是 25.0.6 或更新版本，可以指定版本号安装，例如: sudo apt-get install docker-ce=<VERSION_STRING> docker-ce-cli=<VERSION_STRING> containerd.io ...)
+```
+
+#### 2.1.3 安装Docker Engine
+
+```bash
+# 安装最新版本的Docker Engine, CLI, Containerd, Docker Compose
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-# 4. 验证安装
-sudo docker --version # 确认版本为 25.0.6+
+
+# 启动并启用Docker服务
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# 将当前用户添加到docker组 (避免每次使用sudo)
+sudo usermod -aG docker $USER
+
+# 验证安装 (注意：需要重新登录或执行 newgrp docker)
+sudo docker --version
 sudo docker run hello-world
-# 5. 配置 cgroup driver (对于 Kubernetes 很重要)
-# 创建或修改 /etc/docker/daemon.json:
-# {
-#   "exec-opts": ["native.cgroupdriver=systemd"],
-#   "log-driver": "json-file",
-#   "log-opts": {
-#     "max-size": "100m"
-#   },
-#   "storage-driver": "overlay2"
-# }
+```
+
+#### 2.1.4 配置Docker for Kubernetes
+
+```bash
+# 创建Docker配置目录
 sudo mkdir -p /etc/docker
-sudo tee /etc/docker/daemon.json <<EOF
+
+# 创建Docker daemon配置文件 (重要：Kubernetes需要systemd cgroup driver)
+sudo tee /etc/docker/daemon.json << 'EOF'
 {
   "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
   "log-opts": {
-    "max-size": "100m"
+    "max-size": "100m",
+    "max-file": "3"
   },
-  "storage-driver": "overlay2"
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ]
 }
 EOF
-sudo systemctl enable docker
+
+# 重新加载daemon配置并重启Docker
 sudo systemctl daemon-reload
 sudo systemctl restart docker
-# 6. 确保 Containerd 配置 (Kubernetes 将直接使用 Containerd)
-#    Docker Engine 25.0.6+ 通常会正确配置 Containerd。
-#    检查 /etc/containerd/config.toml 文件。
-#    如果需要修改，例如确保 systemd cgroup driver:
-#    sudo mkdir -p /etc/containerd
-#    containerd config default | sudo tee /etc/containerd/config.toml
-#    sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
-#    sudo systemctl restart containerd
+
+# 验证配置
+sudo docker info | grep -i cgroup
 ```
-(参考官方文档: [https://docs.docker.com/engine/install/ubuntu/](https://docs.docker.com/engine/install/ubuntu/))
 
-### 2.2. Kubernetes (k8s)
+**参考文档**: [Docker Engine Installation Guide](https://docs.docker.com/engine/install/ubuntu/)
 
-**版本**: 1.28.8
+### 2.2 Docker Compose 配置
 
-**注意**: 确保 `kubeadm`, `kubelet`, `kubectl` 版本均为 1.28.8。 Kubernetes 的所有组件（包括 Master 和 Worker 节点）都将运行在 Ubuntu 22.04 LTS 服务器上。
+为了支持本地开发和简单的多容器应用部署，需要配置Docker Compose：
 
-**安装步骤 (使用 `kubeadm`):**
 ```bash
-# 0. 准备工作 (所有将作为 Kubernetes 节点的服务器上执行)
-#    - 禁用 swap:
-sudo swapoff -a
-#   永久禁用 swap，注释掉 /etc/fstab 文件中包含 swap 的行
-sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+# 验证Docker Compose Plugin安装
+docker compose version
 
-#    - 配置内核参数 (确保 overlay 和 br_netfilter 模块加载，并设置必要的 sysctl 参数):
-cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
-overlay
-br_netfilter
-EOF
-sudo modprobe overlay
-sudo modprobe br_netfilter
+# 创建基础的compose配置目录
+sudo mkdir -p /opt/docker-compose
+sudo chown $USER:$USER /opt/docker-compose
 
-cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-iptables  = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-net.ipv4.ip_forward                 = 1
-EOF
-sudo sysctl --system
-
-#    - 确保 containerd 已安装并正确配置 (通过上述 Docker 安装步骤应已完成)
-#      验证 containerd 服务正在运行:
-sudo systemctl status containerd
-#      如果 containerd 未运行或配置不正确 (特别是 cgroup driver)，请返回 Docker 安装部分检查。
-
-# 1. 安装 kubeadm, kubelet, kubectl (所有 Kubernetes 节点上执行)
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl gpg
-
-#   添加 Kubernetes APT 仓库的 GPG 密钥和源。
-#   选项 A: 使用 Kubernetes 官方源 (如果网络允许)
-#   curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-#   echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
-#   选项 B: 使用国内镜像源 (例如阿里云，推荐在中国大陆环境使用)
-curl -fsSL https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.28/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
-sudo apt-get update
-#   安装指定版本的 kubelet, kubeadm, kubectl
-KUBE_VERSION="1.28.8-*" # 使用通配符确保获取该补丁版本的最新修订版，例如 1.28.8-1.1 或更高
-sudo apt-get install -y kubelet=${KUBE_VERSION} kubeadm=${KUBE_VERSION} kubectl=${KUBE_VERSION}
-#   锁定版本，防止意外自动升级导致版本不一致
-sudo apt-mark hold kubelet kubeadm kubectl
-
-# 2. 初始化 Master 节点 (Control Plane) - 在选定的 Master 节点上执行
-#    注意: --pod-network-cidr 必须与您选择安装的 CNI 插件所期望的 CIDR 一致。
-#          Calico 默认通常使用 192.168.0.0/16。
-#          --image-repository 用于指定拉取 Kubernetes 控制平面镜像的仓库，使用国内镜像可以加速。
-#          --cri-socket 指定容器运行时的 socket 文件路径，对于 Containerd 通常是 /var/run/containerd/containerd.sock。
-#          请将 <YOUR_MASTER_IP> 替换为 Master 节点的实际 IP 地址。
-#          --apiserver-advertise-address=<YOUR_MASTER_IP>
-echo "准备初始化 Kubernetes Master 节点..."
-echo "请根据您的网络环境和CNI插件规划，确认以下参数:"
-echo "Pod Network CIDR (例如 Calico: 192.168.0.0/16): "
-read POD_NETWORK_CIDR
-echo "Master 节点 IP 地址 (apiserver-advertise-address): "
-read MASTER_IP
-echo "将使用阿里云镜像仓库 (registry.aliyuncs.com/google_containers) 拉取控制平面镜像。"
-
-sudo kubeadm init \
-  --pod-network-cidr=${POD_NETWORK_CIDR:-192.168.0.0/16} \
-  --kubernetes-version=v1.28.8 \
-  --image-repository=registry.aliyuncs.com/google_containers \
-  --cri-socket=unix:///var/run/containerd/containerd.sock \
-  --apiserver-advertise-address=${MASTER_IP}
-
-#    初始化成功后，kubeadm 会输出需要执行的命令，用于配置 kubectl 和加入 Worker 节点。
-#    请务必记录这些输出。
-#    通常的配置 kubectl 的命令如下 (在 Master 节点上以普通用户执行):
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-# 3. 安装网络插件 (CNI) - 在 Master 节点上执行
-#    推荐使用 Calico Operator 进行安装和管理。
-#    确保 Calico 版本与 Kubernetes 1.28.x 兼容 (例如 Calico v3.27.x 或更高)。
-#    请查阅 Calico 官方文档获取最新的兼容版本和 manifest。
-CALICO_OPERATOR_URL="https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml" # 示例版本，请检查更新
-CALICO_CRDS_URL="https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml" # 示例版本，请检查更新
-
-echo "正在下载并应用 Calico Operator (版本参考: v3.27.0)..."
-kubectl create -f ${CALICO_OPERATOR_URL}
-echo "正在应用 Calico Custom Resource Definitions (CRDs)..."
-# 下面的 custom-resources.yaml 通常定义了 IPPool 等网络配置
-# 您可以下载该文件，根据需要修改 cidr (应与 kubeadm init 时 --pod-network-cidr 一致)
-# 然后再 kubectl apply -f custom-resources.yaml
-# 这里我们使用默认配置，它通常会尝试自动检测或使用常见的 192.168.0.0/16
-# 如果 kubeadm init 时使用了不同的 CIDR，请务必修改此处的 Calico 配置以匹配。
-# 确保下面的 CIDR 与 kubeadm init --pod-network-cidr 一致
-cat <<EOF | kubectl apply -f -
-apiVersion: operator.tigera.io/v1
-kind: Installation
-metadata:
-  name: default
-spec:
-  calicoNetwork:
-    ipPools:
-    - blockSize: 26
-      cidr: ${POD_NETWORK_CIDR:-192.168.0.0/16} # 确保此 CIDR 与 kubeadm init 一致
-      encapsulation: VXLANCrossSubnet # 或者 IPIP, 根据网络环境选择
-      natOutgoing: Enabled
-      nodeSelector: all()
+# 测试Docker Compose
+cat > /tmp/test-compose.yml << 'EOF'
+version: '3.8'
+services:
+  test:
+    image: hello-world
 EOF
 
-echo "等待 Calico Pods 启动..."
-kubectl get pods -n calico-system -w
-
-# 4. Worker 节点加入集群 - 在每个 Worker 节点上执行
-#    使用 Master 节点 `kubeadm init` 成功后输出的 `kubeadm join` 命令。
-#    该命令包含 token 和 CA 证书哈希。
-#    例如:
-#    sudo kubeadm join <master-ip>:<master-port> --token <token> \
-#        --discovery-token-ca-cert-hash sha256:<hash> \
-#        --cri-socket=unix:///var/run/containerd/containerd.sock
-#    请将占位符替换为实际值。
-
-# 5. (可选) 移除 Master 节点的 Taint (如果希望 Master 节点也运行 Pods，不推荐用于生产环境的 Master)
-#    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+docker compose -f /tmp/test-compose.yml up
+docker compose -f /tmp/test-compose.yml down
+rm /tmp/test-compose.yml
 ```
-(参考官方文档: [https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/) 和 [https://kubernetes.io/docs/setup/production-environment/container-runtimes/](https://kubernetes.io/docs/setup/production-environment/container-runtimes/))
 
-### 2.3. CRI-Dockerd
-**不再需要**: 由于您选择了 Docker Engine 25.0.6+ 并将 Kubernetes 配置为直接使用 Containerd (通过 `--cri-socket=unix:///var/run/containerd/containerd.sock`)，因此不再需要 `cri-dockerd`。Kubernetes 1.24+ 已移除 dockershim，推荐直接使用符合 CRI 规范的运行时，如 Containerd。
+## 3. 容器运行时验证
+
+### 3.1 Docker环境验证
+
+创建验证脚本确保Docker环境正常：
+
+```bash
+# 创建Docker环境检查脚本
+sudo tee /usr/local/bin/check-docker.sh << 'EOF'
+#!/bin/bash
+
+echo "=== Docker 环境检查 ==="
+echo
+
+echo "Docker版本信息:"
+docker --version
+docker compose version
+echo
+
+echo "Docker服务状态:"
+systemctl is-active docker
+systemctl is-enabled docker
+echo
+
+echo "Docker配置信息:"
+docker info | grep -E "Cgroup Driver|Storage Driver|Logging Driver"
+echo
+
+echo "Docker权限测试:"
+if docker run --rm hello-world >/dev/null 2>&1; then
+    echo "✅ Docker权限配置正确"
+else
+    echo "❌ Docker权限配置有问题，可能需要重新登录"
+fi
+echo
+
+echo "容器运行时测试:"
+if docker run --rm ubuntu:22.04 echo "容器测试成功" 2>/dev/null; then
+    echo "✅ 容器运行时正常"
+else
+    echo "❌ 容器运行时异常"
+fi
+
+echo
+echo "=== Docker 环境检查完成 ==="
+EOF
+
+chmod +x /usr/local/bin/check-docker.sh
+
+# 运行检查
+/usr/local/bin/check-docker.sh
+```
+
+### 3.2 容器网络测试
+
+```bash
+# 测试Docker网络功能
+echo "测试Docker网络..."
+
+# 创建测试网络
+docker network create test-network
+
+# 启动两个容器测试网络连通性
+docker run -d --name test-container1 --network test-network nginx:alpine
+docker run -d --name test-container2 --network test-network alpine sleep 60
+
+# 测试容器间网络连通性
+if docker exec test-container2 ping -c 2 test-container1 >/dev/null 2>&1; then
+    echo "✅ 容器网络连通性正常"
+else
+    echo "❌ 容器网络连通性异常"
+fi
+
+# 清理测试资源
+docker stop test-container1 test-container2
+docker rm test-container1 test-container2
+docker network rm test-network
+```
+
+## 4. 下一步部署指引
+
+容器平台基础环境部署完成后，根据部署场景选择下一步：
+
+### 4.1 生产环境路径
+如果是生产环境部署，继续进行Kubernetes集群配置：
+
+> 📋 **生产环境下一步**: [Kubernetes网络配置](./02_kubernetes_networking.md)
+> 
+> 该文档包含：
+> - ✅ Kubernetes集群初始化
+> - ✅ CNI网络插件配置  
+> - ✅ Ingress控制器部署
+> - ✅ 网络策略配置
+
+### 4.2 开发环境路径  
+如果是开发环境，可以直接进入中间件部署：
+
+> 📋 **开发环境下一步**: [数据库部署](../02_server_deployment/05_database_setup.md)
+>
+> 使用Docker Compose进行：
+> - ✅ PostgreSQL数据库
+> - ✅ Redis缓存
+> - ✅ MongoDB文档存储
+
+## 📝 重要说明
+
+### 容器化平台选择建议
+
+- **开发环境**: 使用Docker + Docker Compose，部署简单，资源消耗低
+- **测试环境**: 可选择Docker Compose或单节点Kubernetes
+- **生产环境**: 推荐使用Kubernetes集群，提供高可用性和扩展性
+
+### 安全配置提醒
+
+```bash
+# 定期更新Docker
+sudo apt update && sudo apt upgrade docker-ce docker-ce-cli containerd.io
+
+# 清理未使用的容器和镜像
+docker system prune -f
+
+# 监控磁盘使用情况
+docker system df
+```
+
+---
+*文档更新时间: 2025年5月30日 - 专注Docker基础平台配置*

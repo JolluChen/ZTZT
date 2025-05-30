@@ -1,49 +1,142 @@
-# AI 中台 - Django 与 RESTful API 环境配置
+# ⭐ AI中台 - Django REST API完整部署指南 (Ubuntu 24.04 LTS)
 
-本文档指导如何在 AI 中台项目中配置 Django 和 Django REST Framework (DRF) 以支持中台管理系统的后端服务和 RESTful API。
+本文档指导如何在AI中台项目中配置Django和Django REST Framework (DRF)以支持中台管理系统的后端服务和RESTful API。
+
+> **⚠️ 重要提示**: 本文档基于成功优化的最小化AI平台示例，确保所有配置与实际项目兼容。
+
+## ⏱️ 预计部署时间
+- **Django环境配置**: 45-60分钟
+- **API框架设置**: 30-45分钟  
+- **认证系统集成**: 45-60分钟
+- **测试和验证**: 30分钟
+- **总计**: 2.5-3小时
+
+## 🎯 部署目标
+✅ Django 4.2.16 + DRF 3.15.2 环境  
+✅ JWT认证系统  
+✅ 四大平台API (算法、数据、模型、服务)  
+✅ Swagger API文档  
+✅ 权限管理系统
+
+## 📋 前提条件
+
+在开始之前，请确保已完成：
+- ✅ [Ubuntu 24.04 基础系统安装](../01_environment_deployment/00_os_installation_ubuntu.md)
+- ✅ [Python 3.10 开发环境配置](./09_python_environment_setup.md)
+- ✅ [数据库系统安装](./05_database_setup.md)
 
 ## 1. 概述
 
 Django 将用于构建中台的管理后台界面，而 Django REST Framework 将用于提供中台内部以及与外部应用交互的 RESTful API。这种组合为快速开发、身份认证和权限管理提供了强大的支持。
 
-参考 `docs/Outline.md`，相关技术栈包括：
-
--   **后端框架**: Python 3.10, Django
--   **API 框架**: Django REST Framework
--   **身份认证**: Django REST Framework + JWT (JSON Web Tokens)
--   **权限管理 (应用层)**: Django + Django-Guardian, OPA (Open Policy Agent) - 本文档主要关注 Django 原生和 DRF 的配置。
+### 技术栈
+- **后端框架**: Python 3.10 + Django 4.2
+- **API 框架**: Django REST Framework 3.15
+- **身份认证**: JWT (JSON Web Tokens)
+- **数据库**: PostgreSQL 16 (生产) / SQLite (开发)
+- **缓存**: Redis 7.0
+- **文档**: Swagger (drf-yasg)
 
 ## 2. 环境准备
 
-### 2.1. Python 环境
-
-确保已安装 Python 3.10 或更高版本。建议使用虚拟环境管理项目依赖。
+### 2.1 激活Python虚拟环境
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate  # Windows
+# 激活AI平台环境 (按照09_python_environment_setup.md配置的环境)
+source /opt/ai-platform/ai-platform-env/bin/activate
+
+# 或使用快捷命令
+ai-platform
+
+# 验证Python环境
+python --version  # 应该显示Python 3.10.x
+which python      # 应该指向虚拟环境中的Python
 ```
 
-### 2.2. 安装核心依赖
+### 2.2 创建项目目录结构
 
 ```bash
-pip install django djangorestframework djangorestframework-simplejwt django-guardian
+# 创建AI平台后端项目目录
+cd /opt/ai-platform
+mkdir -p backend/{config,apps,static,media,logs}
+cd backend
+
+# 设置目录权限
+sudo chown -R $USER:$USER /opt/ai-platform/backend
 ```
 
--   `django`: 核心 Web 框架。
--   `djangorestframework`: 用于构建 RESTful API。
--   `djangorestframework-simplejwt`: 用于 JWT 认证。
--   `django-guardian`: 用于对象级权限管理 (如果需要)。
-
-## 3. Django 项目配置
-
-### 3.1. 创建 Django 项目和应用
+### 2.3 安装Django相关依赖
 
 ```bash
-django-admin startproject ai_platform .  # 在当前目录创建项目
-python manage.py startapp admin_panel     # 创建一个名为 admin_panel 的应用
-python manage.py startapp api_service     # 创建一个名为 api_service 的应用 (用于API)
+# 确保在虚拟环境中
+source /opt/ai-platform/ai-platform-env/bin/activate
+
+# 安装Django核心组件
+pip install \
+    Django==4.2.16 \
+    djangorestframework==3.15.2 \
+    djangorestframework-simplejwt==5.3.0 \
+    django-cors-headers==4.3.1 \
+    drf-yasg==1.21.7
+
+# 安装数据库驱动
+pip install \
+    psycopg2-binary==2.9.9 \
+    redis==5.0.1
+
+# 安装其他必要组件
+pip install \
+    python-dotenv==1.0.0 \
+    celery==5.3.4 \
+    gunicorn==21.2.0 \
+    whitenoise==6.6.0
+
+# 验证安装
+python -c "import django; print(f'Django: {django.get_version()}')"
+python -c "import rest_framework; print('DRF installed successfully')"
+```
+
+## 3. Django 项目初始化
+
+### 3.1 创建Django项目
+
+```bash
+# 确保在正确的目录中
+cd /opt/ai-platform/backend
+
+# 创建Django项目
+django-admin startproject config .
+
+# 创建应用目录结构
+mkdir -p apps
+cd apps
+
+# 创建各个应用模块
+python ../manage.py startapp authentication
+python ../manage.py startapp algorithm_platform
+python ../manage.py startapp data_platform
+python ../manage.py startapp model_platform
+python ../manage.py startapp service_platform
+
+# 返回后端目录
+cd ..
+
+# 验证项目结构
+tree -L 3 .
+```
+
+### 3.2 配置应用模块
+
+为每个应用创建 `__init__.py` 文件：
+
+```bash
+# 创建apps包的__init__.py
+touch apps/__init__.py
+
+# 为每个应用配置模块
+for app in authentication algorithm_platform data_platform model_platform service_platform; do
+    echo "default_app_config = 'apps.$app.apps.${app^}Config'" > apps/$app/__init__.py
+done
 ```
 
 ### 3.2. 配置文件 (`ai_platform/settings.py`)
