@@ -16,7 +16,7 @@
 - ✅ 系统安全配置和加固
 - ✅ 网络和防火墙设置
 - ✅ Python 3.10 开发环境
-- ✅ GPU驱动和CUDA环境 (RTX 2080Ti × 5)
+- ✅ GPU驱动和CUDA环境 (RTX 2080Ti × 4)
 - ✅ 系统监控和日志配置
 
 ### ⏱️ 预计部署时间
@@ -29,7 +29,7 @@
 ### 🖥️ 目标硬件配置
 - **CPU**: 高性能多核处理器
 - **内存**: 128GB DDR4/DDR5
-- **显卡**: 5×RTX 2080Ti (55GB总显存)
+- **显卡**: 4×RTX 2080Ti (44GB总显存)
 - **存储**: 3×1TB SATA SSD (系统盘+RAID0数据存储)
 - **网络**: 千兆以上网络接口
 
@@ -45,8 +45,8 @@
 ```
 
 #### AI计算性能预期
-- **深度学习训练**: 5块RTX 2080Ti并行计算
-- **大模型推理**: 55GB显存支持大型AI模型
+- **深度学习训练**: 4块RTX 2080Ti并行计算
+- **大模型推理**: 44GB显存支持大型AI模型
 - **数据处理**: 2TB RAID 0高速数据存储
 - **系统响应**: NVMe SSD确保极快的I/O性能
 
@@ -271,7 +271,7 @@ sleep 5
 # 9. 创建优化的ext4文件系统
 echo "创建优化的ext4文件系统..."
 mkfs.ext4 -F -L "ZT-DATA" \
-    -O ^has_journal,large_file,extent,flex_bg \
+    -O large_file,extent,flex_bg \
     -E stride=16,stripe-width=32,lazy_itable_init=0 \
     -m 1 \
     /dev/md0
@@ -378,7 +378,7 @@ sudo mdadm --create --verbose /dev/md0 \
 
 # 6. 创建文件系统
 sudo mkfs.ext4 -F -L "ZT-DATA-RAID0" \
-    -O ^has_journal,large_file,extent,flex_bg \
+    -O large_file,extent,flex_bg \
     -E stride=32,stripe-width=64,lazy_itable_init=0 \
     -m 1 \
     /dev/md0
@@ -396,7 +396,6 @@ sudo chown -R $USER:$USER /data
 
 # 9. 保存RAID配置
 sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
-sudo update-initramfs -u
 sudo update-initramfs -u
 ```
 
@@ -545,7 +544,7 @@ timedatectl status
 
 ```bash
 # 设置主机名
-sudo hostnamectl set-hostname ai-platform-server
+sudo hostnamectl set-hostname lsyzt
 
 # 更新hosts文件
 echo "127.0.0.1 $(hostname)" | sudo tee -a /etc/hosts
@@ -663,7 +662,7 @@ redis-cli --version
 
 ## 4. GPU驱动和AI框架配置
 
-### 4.1 NVIDIA驱动安装 (RTX 2080Ti × 5)
+### 4.1 NVIDIA驱动安装 (RTX 2080Ti × 4)
 
 ```bash
 # 检测可用的NVIDIA驱动
