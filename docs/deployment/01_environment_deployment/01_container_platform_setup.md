@@ -49,23 +49,48 @@ sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg lsb-release
 ```
 
-#### 2.1.2 配置Docker官方仓库
+#### 2.1.2 配置Docker仓库
 
 ```bash
 # 创建keyrings目录
 sudo install -m 0755 -d /etc/apt/keyrings
 
-# 下载并安装Docker官方GPG密钥
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
+# 下载并安装Docker GPG密钥 (推荐使用国内镜像源提高稳定性)
+# 方案1: 官方源 (如果网络良好)
+# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-# 添加Docker官方APT源
+# 方案2: 阿里云镜像源 (推荐国内服务器使用)
+echo "正在从阿里云镜像下载Docker GPG密钥..."
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# 验证GPG密钥文件是否成功下载且非空
+if [ -f /etc/apt/keyrings/docker.gpg ] && [ $(stat -c%s "/etc/apt/keyrings/docker.gpg") -gt 0 ]; then
+    echo "✅ GPG密钥下载成功。"
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+else
+    echo "❌ GPG密钥下载失败！请检查网络连接或尝试其他镜像。"
+    # 如果您想在失败时停止脚本，可以取消下一行的注释
+    # exit 1 
+fi
+
+# 添加Docker APT源 (使用阿里云镜像)
+echo "正在配置阿里云Docker APT源..."
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
+# 验证APT源文件是否创建成功
+if [ -f /etc/apt/sources.list.d/docker.list ]; then
+    echo "✅ APT源配置文件创建成功。"
+    cat /etc/apt/sources.list.d/docker.list
+else
+    echo "❌ APT源配置文件创建失败！"
+    # exit 1
+fi
+
 # 更新包索引
+echo "正在更新APT包索引..."
 sudo apt-get update
 ```
 
@@ -74,6 +99,14 @@ sudo apt-get update
 ```bash
 # 安装最新版本的Docker Engine, CLI, Containerd, Docker Compose
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 如果安装过程中出现下载失败或超时问题，可以尝试:
+# 1. 逐个安装组件，可以避免单个失败导致全部重试:
+# sudo apt-get install -y docker-ce
+# sudo apt-get install -y docker-ce-cli
+# sudo apt-get install -y containerd.io
+# sudo apt-get install -y docker-buildx-plugin
+# sudo apt-get install -y docker-compose-plugin
 
 # 启动并启用Docker服务
 sudo systemctl start docker
@@ -93,19 +126,25 @@ sudo docker run hello-world
 # 创建Docker配置目录
 sudo mkdir -p /etc/docker
 
-# 创建Docker daemon配置文件 (重要：Kubernetes需要systemd cgroup driver)
+# 创建Docker daemon配置文件 (重要：Kubernetes需要systemd cgroup driver + 国内镜像源)
 sudo tee /etc/docker/daemon.json << 'EOF'
 {
+  "registry-mirrors": [
+    "https://docker.mirrors.tuna.tsinghua.edu.cn",
+    "https://do.nark.eu.org",
+    "https://dc.j8.work",
+    "https://docker.m.daocloud.io",
+    "https://dockerproxy.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://docker.nju.edu.cn"
+  ],
   "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "100m",
     "max-file": "3"
   },
-  "storage-driver": "overlay2",
-  "storage-opts": [
-    "overlay2.override_kernel_check=true"
-  ]
+  "storage-driver": "overlay2"
 }
 EOF
 
@@ -115,6 +154,10 @@ sudo systemctl restart docker
 
 # 验证配置
 sudo docker info | grep -i cgroup
+sudo docker info | grep -A 10 "Registry Mirrors"
+
+# 测试镜像拉取功能
+sudo docker run hello-world
 ```
 
 **参考文档**: [Docker Engine Installation Guide](https://docs.docker.com/engine/install/ubuntu/)
@@ -256,6 +299,62 @@ docker network rm test-network
 - **测试环境**: 可选择Docker Compose或单节点Kubernetes
 - **生产环境**: 推荐使用Kubernetes集群，提供高可用性和扩展性
 
+### 🛠️ 常见问题解决
+
+#### 问题1: Docker 启动失败 - overlay2 选项错误
+**错误信息**: 
+```
+failed to start daemon: error initializing graphdriver: overlay2: unknown option overlay2.override_kernel_check: overlay2
+```
+
+**原因**: `overlay2.override_kernel_check=true` 选项在新版本 Docker 中已被废弃
+
+**解决方案**: 
+```bash
+# 移除已废弃的 storage-opts 配置
+sudo tee /etc/docker/daemon.json << 'EOF'
+{
+  "storage-driver": "overlay2"
+}
+EOF
+```
+
+#### 问题2: 镜像拉取超时或连接重置
+**错误信息**: 
+```
+Error response from daemon: Get "https://registry-1.docker.io/v2/": context deadline exceeded
+connection reset by peer
+```
+
+**原因**: 无法直接访问 Docker Hub 官方仓库
+
+**解决方案**: 配置国内镜像源加速器
+```bash
+# 使用经过验证的国内镜像源
+"registry-mirrors": [
+  "https://docker.mirrors.tuna.tsinghua.edu.cn",
+  "https://do.nark.eu.org", 
+  "https://dc.j8.work",
+  "https://docker.m.daocloud.io",
+  "https://dockerproxy.com",
+  "https://docker.mirrors.ustc.edu.cn",
+  "https://docker.nju.edu.cn"
+]
+```
+
+#### 问题3: JSON 配置语法错误
+**错误信息**: Docker 服务启动失败，无明确错误
+
+**解决方案**: 验证 JSON 语法
+```bash
+# 验证配置文件语法
+python3 -m json.tool /etc/docker/daemon.json
+
+# 常见语法错误：
+# - 数组最后元素后多余的逗号
+# - 缺少引号或括号不匹配
+```
+
 ### 安全配置提醒
 
 ```bash
@@ -270,4 +369,4 @@ docker system df
 ```
 
 ---
-*文档更新时间: 2025年5月30日 - 专注Docker基础平台配置*
+*文档更新时间: 2025年6月4日 - 修复Docker配置问题并优化镜像源配置*
