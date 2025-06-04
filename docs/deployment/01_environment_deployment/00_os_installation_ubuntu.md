@@ -691,10 +691,10 @@ wget https://developer.download.nvidia.com/compute/cuda/12.3.0/local_installers/
 # 运行CUDA安装程序 (不安装驱动，因为已安装)
 sudo sh cuda_12.3.0_545.23.06_linux.run
 
-# 配置CUDA环境变量
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-echo 'export CUDA_HOME=/usr/local/cuda' >> ~/.bashrc
+# 配置CUDA环境变量 (实际安装路径为cuda-12.3)
+echo 'export PATH=/usr/local/cuda-12.3/bin:$PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.3/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+echo 'export CUDA_HOME=/usr/local/cuda-12.3' >> ~/.bashrc
 source ~/.bashrc
 
 # 验证CUDA安装
@@ -705,23 +705,35 @@ nvidia-smi
 ### 4.3 AI框架安装
 
 ```bash
+# 创建Python虚拟环境 (Ubuntu 24.04必需)
+python3 -m venv ~/ai-env
+source ~/ai-env/bin/activate
+
+# 设置TensorFlow优化环境变量
+echo 'export TF_CPP_MIN_LOG_LEVEL=2' >> ~/.bashrc
+echo 'export TF_ENABLE_ONEDNN_OPTS=1' >> ~/.bashrc
+source ~/.bashrc
+```
+
+在虚拟环境中
+```bash
 # 更新pip
-pip3 install --upgrade pip
+pip install --upgrade pip
 
 # 安装PyTorch (CUDA支持)
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # 安装TensorFlow (GPU支持)
-pip3 install tensorflow[and-cuda]
+pip install tensorflow
 
 # 安装常用AI库
-pip3 install numpy pandas scikit-learn matplotlib seaborn
-pip3 install transformers datasets accelerate
-pip3 install jupyter notebook
+pip install numpy pandas scikit-learn matplotlib seaborn
+pip install transformers datasets accelerate
+pip install jupyter notebook
 
 # 验证GPU可用性
-python3 -c "import torch; print(f'PyTorch CUDA: {torch.cuda.is_available()}, GPU count: {torch.cuda.device_count()}')"
-python3 -c "import tensorflow as tf; print(f'TensorFlow GPU: {len(tf.config.list_physical_devices(\"GPU\"))}')"
+python -c "import torch; print(f'PyTorch CUDA: {torch.cuda.is_available()}, GPU count: {torch.cuda.device_count()}')"
+python -c "import tensorflow as tf; print(f'TensorFlow GPU: {len(tf.config.list_physical_devices(\"GPU\"))}')"
 ```
 
 ### 4.4 GPU监控和管理
@@ -799,8 +811,8 @@ EOF
 ```bash
 # 配置AI框架环境变量
 sudo tee -a /etc/environment << 'EOF'
-# CUDA环境
-CUDA_HOME=/usr/local/cuda
+# CUDA环境 (与实际安装路径一致)
+CUDA_HOME=/usr/local/cuda-12.3
 CUDA_DEVICE_ORDER=PCI_BUS_ID
 
 # PyTorch优化
@@ -939,271 +951,294 @@ check-system.sh
 ### 7.1 硬件配置验证
 
 ```bash
-# 创建完整的硬件验证脚本
-sudo tee /usr/local/bin/validate-ai-workstation.sh << 'EOF'
-#!/bin/bash
+# 4×RTX 2080Ti GPU配置验证
+check-system.sh
 
-echo "========================================"
-echo "    AI高性能工作站完整验证测试"
-echo "========================================"
-echo "测试时间: $(date)"
-echo
-
-# 1. 基础硬件检测
-echo "1. 硬件配置验证"
-echo "----------------------------------------"
-echo "CPU信息:"
-echo "  型号: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"
-echo "  核心数: $(nproc) 物理核心"
-echo "  架构: $(lscpu | grep Architecture | cut -d: -f2 | xargs)"
-
-echo "内存信息:"
-echo "  总内存: $(free -h | grep '^Mem:' | awk '{print $2}')"
-echo "  可用内存: $(free -h | grep '^Mem:' | awk '{print $7}')"
-echo "  内存使用率: $(free | grep '^Mem:' | awk '{printf "%.1f%%", ($3/$2)*100}')"
-
-if [ -f /proc/meminfo ]; then
-    echo "  内存详情: $(grep MemTotal /proc/meminfo | awk '{printf "%.1fGB", $2/1024/1024}')"
-fi
-echo
-
-# 2. 存储系统验证
-echo "2. 存储系统验证"
-echo "----------------------------------------"
-echo "NVMe设备:"
-lsblk -d -o NAME,SIZE,MODEL | grep nvme || echo "  未检测到NVMe设备"
-
-echo "RAID状态:"
-if [ -f /proc/mdstat ]; then
-    cat /proc/mdstat | grep -A3 md0 || echo "  RAID未配置"
-else
-    echo "  mdadm未安装"
-fi
-
-echo "文件系统:"
-echo "  系统盘: $(df -h / | tail -1 | awk '{print $2" 总计, "$4" 可用, "$5" 使用率"}')"
-if mountpoint -q /data; then
-    echo "  数据盘: $(df -h /data | tail -1 | awk '{print $2" 总计, "$4" 可用, "$5" 使用率"}')"
-else
-    echo "  数据盘: 未挂载"
-fi
-echo
-
-# 3. GPU配置验证
-echo "3. GPU配置验证"
-echo "----------------------------------------"
-if command -v nvidia-smi &> /dev/null; then
-    echo "NVIDIA驱动: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)"
-    echo "CUDA版本: $(nvcc --version 2>/dev/null | grep release | awk '{print $6}' | cut -d, -f1 || echo '未安装')"
-    echo "GPU数量: $(nvidia-smi --list-gpus | wc -l)"
-    echo "GPU详情:"
-    nvidia-smi --query-gpu=index,name,memory.total,temperature.gpu --format=csv | grep -v index
-    echo "总显存: $(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | awk '{sum+=$1} END {printf "%.1fGB", sum/1024}')"
-else
-    echo "未检测到NVIDIA驱动或GPU"
-fi
-echo
-
-# 4. 网络配置验证
-echo "4. 网络配置验证"
-echo "----------------------------------------"
-echo "网络接口:"
-ip addr show | grep -E "^[0-9]+:" | grep -v lo | awk '{print "  "$2}' | tr -d ':'
-echo "活动连接:"
-ip addr show | grep -E "inet.*global" | awk '{print "  "$2}' | head -3
-echo "DNS配置:"
-grep nameserver /etc/resolv.conf | awk '{print "  "$2}' | head -2
-echo
-
-# 5. 系统服务验证
-echo "5. 系统服务验证"
-echo "----------------------------------------"
-echo "SSH服务: $(systemctl is-active ssh)"
-echo "时间同步: $(timedatectl status | grep 'synchronized' | awk '{print $4}')"
-echo "防火墙: $(sudo ufw status | head -1 | cut -d: -f2 | xargs)"
-echo "系统负载: $(uptime | awk -F'load average:' '{print $2}' | xargs)"
-echo
-
-# 6. AI框架验证
-echo "6. AI框架验证"
-echo "----------------------------------------"
-if python3 -c "import torch" 2>/dev/null; then
-    echo "PyTorch: $(python3 -c "import torch; print(torch.__version__)")"
-    echo "PyTorch CUDA: $(python3 -c "import torch; print('支持' if torch.cuda.is_available() else '不支持')")"
-    if python3 -c "import torch; torch.cuda.is_available()" 2>/dev/null; then
-        echo "可用GPU数: $(python3 -c "import torch; print(torch.cuda.device_count())")"
-    fi
-else
-    echo "PyTorch: 未安装"
-fi
-
-if python3 -c "import tensorflow" 2>/dev/null; then
-    echo "TensorFlow: $(python3 -c "import tensorflow as tf; print(tf.__version__)")"
-    echo "TF GPU支持: $(python3 -c "import tensorflow as tf; print('支持' if len(tf.config.list_physical_devices('GPU')) > 0 else '不支持')")"
-else
-    echo "TensorFlow: 未安装"
-fi
-echo
-
-echo "========================================"
-echo "验证完成时间: $(date)"
-echo "========================================"
-EOF
-
-# 设置执行权限
-sudo chmod +x /usr/local/bin/validate-ai-workstation.sh
-
-# 运行完整验证
-/usr/local/bin/validate-ai-workstation.sh
-```
-
-### 7.2 系统验证与性能基准
-
-```bash
-# 快速系统验证
-echo "========================================"
-echo "    AI工作站系统验证"
-echo "========================================"
-
-# 基础硬件检查
-echo "硬件配置验证:"
-echo "CPU核心数: $(nproc)"
-echo "内存总量: $(free -h | grep '^Mem:' | awk '{print $2}')"
-echo "GPU数量: $(nvidia-smi -L | wc -l)"
-echo "存储设备: $(lsblk | grep disk | wc -l) 块设备"
-
-# RAID状态检查
-if [ -e /dev/md0 ]; then
-    echo "RAID状态: 正常"
-    cat /proc/mdstat | grep md0
-else
-    echo "RAID状态: 未配置"
-fi
-
-# GPU状态检查
-echo "GPU状态:"
-nvidia-smi --query-gpu=name,temperature.gpu,utilization.gpu --format=csv
-
-# 简单性能测试
-echo "快速性能测试:"
-echo "- CPU: $(sysbench cpu --cpu-max-prime=10000 --threads=1 run 2>/dev/null | grep 'events per second' | awk '{print $4, $5}')"
-echo "- 内存: $(sysbench memory --memory-total-size=1G run 2>/dev/null | grep 'transferred' | awk '{print $3, $4}')"
-if mountpoint -q /data; then
-    echo "- 数据盘: $(sudo hdparm -t /data 2>/dev/null | tail -1)"
-fiecho "========================================"
-echo "系统验证完成 - 准备就绪"
-echo "========================================"
-```
-
-### 7.3 AI框架验证
-
-> **🔧 详细验证**: 完整的AI框架功能验证流程请参考专门的验证脚本和测试套件
-
-```bash
-# 快速AI框架验证
-echo "AI框架快速验证:"
-
-# PyTorch验证
+# GPU内存和性能测试
 python3 -c "
 import torch
 print(f'PyTorch版本: {torch.__version__}')
 print(f'CUDA可用: {torch.cuda.is_available()}')
-if torch.cuda.is_available():
-    print(f'GPU数量: {torch.cuda.device_count()}')
-    print('✅ PyTorch GPU支持正常')
-else:
-    print('❌ PyTorch GPU支持异常')
+print(f'GPU数量: {torch.cuda.device_count()}')
+for i in range(torch.cuda.device_count()):
+    print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
+    print(f'  显存: {torch.cuda.get_device_properties(i).total_memory / 1024**3:.1f}GB')
 "
 
-# TensorFlow验证
+# TensorFlow GPU测试
 python3 -c "
 import tensorflow as tf
-print(f'TensorFlow版本: {tf.__version__}')
 gpus = tf.config.list_physical_devices('GPU')
-print(f'GPU设备: {len(gpus)}个')
-if len(gpus) > 0:
-    print('✅ TensorFlow GPU支持正常')
-else:
-    print('❌ TensorFlow GPU支持异常')
+print(f'TensorFlow版本: {tf.__version__}')
+print(f'检测到GPU数量: {len(gpus)}')
+for i, gpu in enumerate(gpus):
+    print(f'GPU {i}: {gpu.name}')
 "
-echo "✅ AI框架验证完成"
 ```
 
-## 8. 下一步：容器平台部署
-
-### 8.1 部署流程概览
-
-> **🚀 AI中台部署路径**:
-> 1. ✅ **操作系统安装** (当前文档)
-> 2. 🔄 **容器平台搭建** → [容器平台配置指南](../02_container_platform/01_container_platform_setup.md)
-> 3. 🔄 **AI服务部署** → [AI服务部署指南](../03_ai_services/README.md)
-
-### 8.2 系统状态确认
-
-运行以下命令确认系统准备就绪：
+### 7.2 AI框架性能基准测试
 
 ```bash
-# 系统状态检查
-echo "========== 系统状态检查 =========="
-echo "操作系统: $(lsb_release -d | cut -f2)"
-echo "内核版本: $(uname -r)"
-echo "Python版本: $(python3 --version)"
-echo "GPU驱动: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)"
-echo "CUDA版本: $(nvcc --version | grep release | awk '{print $6}' | cut -c2-)"
-echo "Docker状态: $(systemctl is-active docker)"
+# 创建GPU性能测试脚本
+tee ~/gpu_benchmark.py << 'EOF'
+import torch
+import tensorflow as tf
+import time
+import numpy as np
 
-# RAID状态检查
-if [ -e /dev/md0 ]; then
-    echo "RAID状态: 已配置"
-    echo "数据目录: /data ($(df -h /data | tail -1 | awk '{print $2}'))"
-else
-    echo "RAID状态: 未配置 (可选)"
-fi
+def pytorch_benchmark():
+    print("=== PyTorch GPU基准测试 ===")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"使用设备: {device}")
+    
+    # 矩阵乘法测试
+    size = 4000
+    a = torch.randn(size, size, device=device)
+    b = torch.randn(size, size, device=device)
+    
+    # 预热
+    torch.matmul(a, b)
+    torch.cuda.synchronize()
+    
+    # 性能测试
+    start_time = time.time()
+    for _ in range(10):
+        c = torch.matmul(a, b)
+    torch.cuda.synchronize()
+    end_time = time.time()
+    
+    avg_time = (end_time - start_time) / 10
+    gflops = (2 * size**3) / (avg_time * 1e9)
+    print(f"矩阵乘法 ({size}x{size}): {avg_time:.3f}s, {gflops:.1f} GFLOPS")
 
-echo "========== 准备就绪 ==========="
-echo "✅ 基础系统配置完成"
-echo "✅ AI开发环境就绪"
-echo "✅ GPU加速支持可用"
-echo ""
-echo "下一步: 请参考容器平台配置文档"
-echo "文档路径: docs/deployment/02_container_platform/"
+def tensorflow_benchmark():
+    print("\n=== TensorFlow GPU基准测试 ===")
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError as e:
+            print(e)
+    
+    with tf.device('/GPU:0'):
+        size = 4000
+        a = tf.random.normal([size, size])
+        b = tf.random.normal([size, size])
+        
+        # 预热
+        tf.matmul(a, b)
+        
+        # 性能测试
+        start_time = time.time()
+        for _ in range(10):
+            c = tf.matmul(a, b)
+        end_time = time.time()
+        
+        avg_time = (end_time - start_time) / 10
+        gflops = (2 * size**3) / (avg_time * 1e9)
+        print(f"矩阵乘法 ({size}x{size}): {avg_time:.3f}s, {gflops:.1f} GFLOPS")
+
+if __name__ == "__main__":
+    pytorch_benchmark()
+    tensorflow_benchmark()
+EOF
+
+# 运行基准测试
+python3 ~/gpu_benchmark.py
 ```
 
-### 8.3 故障排除
-
-常见问题快速解决：
+### 7.3 存储性能验证
 
 ```bash
-# GPU驱动问题
-if ! nvidia-smi >/dev/null 2>&1; then
-    echo "❌ GPU驱动异常，请重新安装NVIDIA驱动"
-    echo "参考: 第4.1节 GPU驱动安装"
-fi
-
-# Docker服务问题
-if ! systemctl is-active docker >/dev/null 2>&1; then
-    echo "❌ Docker服务未运行"
-    sudo systemctl start docker
-    sudo systemctl enable docker
-fi
-
-# Python环境问题
-if ! python3 -c "import torch" >/dev/null 2>&1; then
-    echo "❌ PyTorch环境异常，请重新安装"
-    echo "参考: 第3.2节 AI开发工具链"
+# RAID 0存储性能测试 (如果已配置)
+if mountpoint -q /data; then
+    echo "=== 存储性能测试 ==="
+    
+    # 顺序写入测试
+    echo "顺序写入测试 (1GB):"
+    dd if=/dev/zero of=/data/test_write bs=1M count=1024 conv=fsync 2>&1 | grep -E "(copied|MB/s)"
+    
+    # 顺序读取测试
+    echo "顺序读取测试 (1GB):"
+    dd if=/data/test_write of=/dev/null bs=1M 2>&1 | grep -E "(copied|MB/s)"
+    
+    # 随机I/O测试 (需要fio工具)
+    if command -v fio >/dev/null 2>&1; then
+        echo "随机I/O测试:"
+        fio --name=random-rw --ioengine=libaio --iodepth=16 --rw=randrw --bs=4k --direct=1 \
+            --size=1G --numjobs=1 --runtime=30 --group_reporting --filename=/data/fio-test
+    else
+        echo "安装fio进行详细I/O测试: sudo apt install fio"
+    fi
+    
+    # 清理测试文件
+    rm -f /data/test_write /data/fio-test
 fi
 ```
+
+### 7.4 网络和系统稳定性测试
+
+```bash
+# 网络连接测试
+echo "=== 网络连接测试 ==="
+ping -c 4 8.8.8.8 || echo "❌ 外网连接异常"
+ping -c 4 223.5.5.5 || echo "❌ 国内DNS异常"
+
+# AI框架依赖下载测试
+echo "=== AI框架依赖测试 ==="
+python3 -c "
+import torch
+import torchvision
+import tensorflow as tf
+print('✅ 核心AI框架加载正常')
+
+# 测试模型下载 (小模型测试)
+try:
+    model = torchvision.models.resnet18(pretrained=True)
+    print('✅ PyTorch模型下载正常')
+except:
+    print('⚠️ PyTorch模型下载可能受限')
+"
+
+# 系统稳定性指标
+echo "=== 系统稳定性指标 ==="
+echo "系统运行时间: $(uptime -p)"
+echo "系统负载: $(uptime | awk -F'load average:' '{print $2}')"
+echo "内存使用率: $(free | grep Mem | awk '{printf \"%.1f%%\", $3/$2 * 100.0}')"
+echo "磁盘使用率:"
+df -h | grep -E "(/|/data)" | awk '{print "  "$6": "$5}'
+```
+
+## 8. 部署总结和后续步骤
+
+### 8.1 配置完成检查清单
+
+**✅ 硬件配置确认**
+- [ ] 4×RTX 2080Ti GPU正常工作，总显存83.2GB
+- [ ] 128GB DDR4内存正常识别
+- [ ] RAID 0高速存储正常挂载 (如果配置)
+- [ ] 网络连接稳定，DNS解析正常
+
+**✅ 软件环境确认**
+- [ ] Ubuntu 24.04 LTS系统稳定运行
+- [ ] NVIDIA驱动535.x正常工作
+- [ ] CUDA 12.3工具包安装到/usr/local/cuda-12.3/
+- [ ] Python 3.10/3.12虚拟环境配置完成
+
+**✅ AI框架确认**
+- [ ] PyTorch GPU支持正常，可检测4个GPU
+- [ ] TensorFlow 2.19.0 GPU支持正常
+- [ ] 基准测试性能达到预期
+
+**✅ 系统优化确认**
+- [ ] 内核参数针对AI工作负载优化
+- [ ] 环境变量配置正确
+- [ ] 系统服务稳定运行
+
+### 8.2 性能基准参考
+
+**预期GPU性能指标 (4×RTX 2080Ti):**
+- **单GPU计算性能**: 10-15 TFLOPS (FP32)
+- **总GPU显存**: 83.2GB (4×20.8GB)
+- **GPU间通信**: PCIe 3.0 x16
+
+**预期存储性能 (RAID 0 SSD):**
+- **顺序读取**: 1000-1200 MB/s
+- **顺序写入**: 900-1100 MB/s
+- **随机4K IOPS**: 80,000-100,000
+
+**预期AI训练性能:**
+- **ResNet-50训练**: 150-200 images/sec (batch_size=32)
+- **BERT-base微调**: 8-12 samples/sec
+- **大模型推理**: 根据模型大小而定
+
+### 8.3 后续部署路径
+
+根据AI平台需求选择下一步部署方案：
+
+> **选项A: 🐳 容器化部署** (推荐)
+> 
+> 适用于：生产环境、微服务架构、多环境管理
+> 
+> 下一步：[容器平台配置](../02_container_platform/README.md)
+
+> **选项B: 🔧 直接部署**
+> 
+> 适用于：开发环境、简单部署、性能要求极高场景
+> 
+> 下一步：[服务器直接部署](../03_server_deployment/README.md)
+
+> **选项C: ☸️ Kubernetes部署**
+> 
+> 适用于：大规模生产环境、自动扩缩容、高可用需求
+> 
+> 下一步：[Kubernetes集群配置](../04_kubernetes_deployment/README.md)
+
+### 8.4 系统维护建议
+
+**日常监控命令:**
+```bash
+# 系统状态快速检查
+check-system.sh
+
+# GPU状态监控
+gpu-status.sh
+
+# RAID状态检查 (如果配置)
+cat /proc/mdstat
+
+# 系统资源监控
+htop
+
+# 磁盘空间检查
+df -h
+```
+
+**定期维护任务:**
+```bash
+# 每周：系统更新
+sudo apt update && sudo apt upgrade
+
+# 每月：磁盘清理
+sudo apt autoremove
+sudo apt autoclean
+
+# 每季度：SMART健康检查
+sudo smartctl -a /dev/sdb
+sudo smartctl -a /dev/sdc
+
+# AI模型缓存清理
+find ~/.cache -type f -name "*.tmp" -delete
+```
+
+**备份建议:**
+- 系统配置：定期备份 `/etc/` 目录
+- AI模型：重要模型存储到远程存储
+- 数据：定期备份 `/data/` 目录到外部存储
+
+---
+
+**🎯 环境部署完成!**
+
+您的AI平台高性能工作站环境已准备就绪。系统配置为:
+- **OS**: Ubuntu 24.04 LTS
+- **GPU**: 4×RTX 2080Ti (83.2GB显存)
+- **AI框架**: PyTorch + TensorFlow (GPU加速)
+- **存储**: 高性能RAID 0 (可选)
 
 ---
 
 **📋 文档状态**: 
-- **版本**: v2.0 (优化版)
-- **更新时间**: $(date '+%Y-%m-%d')
-- **状态**: ✅ 基础系统配置完成
+- **版本**: v2.1 (完整优化版)
+- **更新时间**: 2025-06-04
+- **硬件配置**: 4×RTX 2080Ti + 128GB RAM + RAID 0 SSD
+- **系统版本**: Ubuntu 24.04 LTS
+- **状态**: ✅ 环境部署完成，AI平台就绪
 
 **🔗 相关文档**:
 - [容器平台配置](../02_container_platform/01_container_platform_setup.md)
-- [AI服务部署](../03_ai_services/README.md)
-- [数据库部署](../02_server_deployment/05_database_setup.md)
+- [服务器直接部署](../02_server_deployment/)
+- [应用部署指南](../03_application_deployment/)
 
-**💡 技术支持**: 如遇到问题，请参考故障排除章节或查阅相关技术文档。
+**💡 技术支持**: 如遇到问题，请运行 `check-system.sh` 进行诊断，或参考各章节的故障排除部分。
