@@ -523,6 +523,9 @@ replica:
      enabled: true
      storageClass: "local-storage"
      size: "20Gi"
+   extraEnvs:
+     - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+       value: "OPENsearch@123"
    # 如需 Dashboards、账号密码等可补充
    ```
 
@@ -563,51 +566,105 @@ replica:
 
 > 说明：OpenSearch 离线部署时，所有用到的镜像（主容器和 Init 容器）都需提前导入。遇到镜像拉取失败，务必先用 `kubectl describe pod` 查明缺失镜像并补齐。
 
+> OpenSearch 3.0.0 及以上版本必须设置强密码，建议将 admin 密码记录到“账号与密码整理”表格中，便于后续管理。
+
 ---
 
 ### 4.3. 容器持久化数据
 
-#### 4.3.1. MinIO (对象存储)
-**推荐部署方式**: 使用 MinIO Kubernetes Operator 或 Helm Chart 在 Kubernetes 中部署。
+#### 4.3.1 MinIO (对象存储，离线/本地部署实操)
 
-**许可证提醒**: MinIO 使用 AGPL v3.0。
+本节以实际离线部署为例，详细说明 MinIO 在本地 Kubernetes 集群的完整部署流程，确保所有步骤与实际操作一致，便于复现和排查。
 
-**安装步骤 (使用 MinIO Helm Chart - Standalone Mode 示例):**
-1.  添加 MinIO Helm 仓库:
-    ```bash
-    helm repo add minio https://operator.min.io/
-    helm repo update
-    ```
-2.  准备 `minio-values.yaml` (可选)。
-    ```yaml
-    # minio-values.yaml (Standalone 简化示例)
-    mode: standalone
-    accessKey: "YOURACCESSKEY" # 修改
-    secretKey: "YOURSECRETKEY" # 修改
-    persistence:
-      enabled: true
-      storageClass: "your-storage-class" # 替换
-      size: 100Gi
-    ingress:
-      enabled: true
-      hosts:
-        - minio.yourdomain.com # 替换
-      # className: "nginx"
-    ```
-3.  部署 MinIO:
-    ```bash
-    # 创建命名空间
-    kubectl create namespace minio-ns
-    # 安装 (使用旧的 stable/minio chart，官方推荐 Operator，但 Helm chart 仍可用)
-    # helm install minio minio/minio -f minio-values.yaml -n minio-ns --create-namespace
-    # 或者使用新的 MinIO Operator 提供的 Helm Chart (如果适用)
-    # helm install minio-operator minio/operator -n minio-operator --create-namespace
-    # kubectl apply -f tenant.yaml # (需要定义 Tenant CRD)
-    # 对于简单部署，可以直接使用 Bitnami MinIO chart
-    helm repo add bitnami https://charts.bitnami.com/bitnami
-    helm install minio bitnami/minio -f minio-values.yaml -n minio-ns --create-namespace
-    ```
-(参考: [https://min.io/docs/minio/kubernetes/upstream/index.html](https://min.io/docs/minio/kubernetes/upstream/index.html) 和 Bitnami MinIO Chart 文档)
+**部署流程如下：**
+
+1. **准备本地存储目录与 PV**
+   ```bash
+   sudo mkdir -p /data/k8s-local-storage/minio
+   sudo chown -R 1000:1000 /data/k8s-local-storage/minio
+   ```
+   新建 `minio-pv.yaml`：
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: minio-pv
+   spec:
+     capacity:
+       storage: 20Gi
+     accessModes:
+       - ReadWriteOnce
+     storageClassName: local-storage
+     local:
+       path: /data/k8s-local-storage/minio
+     nodeAffinity:
+       required:
+         nodeSelectorTerms:
+           - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                   - lsyzt
+   ```
+   应用 PV：
+   ```bash
+   kubectl apply -f minio-pv.yaml
+   ```
+
+2. **准备 minio-values.yaml**（与实际一致，示例）
+   ```yaml
+   mode: standalone
+   accessKey: "minioadmin"
+   secretKey: "minioadmin123"
+   persistence:
+     enabled: true
+     storageClass: "local-storage"
+     size: 20Gi
+   ingress:
+     enabled: false # 如需 Ingress 按需开启
+   resources:
+     requests:
+       memory: 512Mi
+       cpu: 250m
+   ```
+
+3. **离线下载并导入镜像**
+   - 在有网络的主机（如 Windows）拉取并导出 MinIO 镜像：
+     ```powershell
+     docker pull bitnami/minio:2024.6.4-debian-12-r0
+     docker save bitnami/minio:2024.6.4-debian-12-r0 -o minio-2024.6.4-debian-12-r0.tar
+     ```
+   - 上传 `minio-2024.6.4-debian-12-r0.tar` 到服务器。
+   - 在服务器导入镜像：
+     ```bash
+     sudo ctr -n k8s.io images import minio-2024.6.4-debian-12-r0.tar
+     ```
+
+4. **安装 MinIO**
+   - 上传 `minio-14.6.5.tgz` Chart 包到服务器。
+   - 安装 MinIO：
+     ```bash
+     kubectl create namespace minio-ns
+     helm install minio ./minio-14.6.5.tgz -f minio-values.yaml -n minio-ns --create-namespace
+     ```
+
+5. **验证与排查**
+   - 查看 Pod、PVC、PV 状态：
+     ```bash
+     kubectl get pods -n minio-ns
+     kubectl get pvc -n minio-ns
+     kubectl get pv
+     ```
+   - 如 Pod 卡在 `ImagePullBackOff`，请确认镜像已导入 containerd，导入后删除 Pod 让其自动重建。
+   - 如 PVC 卡在 Pending，检查 PV 与 PVC 的 storageClass、容量、主机名等是否一致。
+   - 端口转发访问 MinIO 控制台：
+     ```bash
+     kubectl port-forward svc/minio 9000:9000 -n minio-ns
+     # 浏览器访问 http://localhost:9000
+     # 默认账号密码见下表
+     ```
+
+> 说明：所有用到的镜像需提前导入，遇到镜像拉取失败，务必先用 `kubectl describe pod` 查明缺失镜像并补齐。账号密码建议同步到“账号与密码整理”表格，便于后续管理。
 
 #### 4.3.2. PostgreSQL (关系型数据库)
 **版本**: 16
@@ -657,7 +714,6 @@ replica:
   - Calico 通常使用 Kubernetes etcd 或其自带的 etcd 作为数据存储。
   - Cilium 也可以使用 Kubernetes etcd 或其他键值存储。
   - 这些通常作为 CNI 插件安装和配置的一部分进行处理，不需要单独部署存储系统。
-
 ---
 
 ## 账号与密码整理（部署默认/示例配置）
@@ -668,5 +724,6 @@ replica:
 | PostgreSQL   | aiuser         | aiuser-2024       | 普通用户，Helm values |
 | Redis        | (无用户名)     | redis-2024        | Helm values           |
 | MinIO        | minioadmin     | minioadmin123     | minio-values.yaml     |
+| OpenSearch   | admin          | OPENsearch@123     | opensearch-values.yaml |
 
 > 说明：如有自定义 values.yaml，请以实际配置为准。生产环境建议修改所有默认密码！
