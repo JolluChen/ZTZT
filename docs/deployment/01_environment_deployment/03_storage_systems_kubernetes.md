@@ -2,9 +2,249 @@
 
 本文档指导如何为 AI 中台的 Kubernetes 集群部署和配置各类存储系统，包括镜像仓库、日志存储、持久化数据存储等。
 
-## 4. 存储系统
+---
 
-### 4.1. Harbor (容器镜像仓库)
+## 1. 基础本地存储配置（推荐单节点/小规模集群，生产环境可选用分布式存储）
+
+### 1.1 创建本地存储目录
+在每个需要本地存储的节点上执行（以主节点 lsyzt 为例）：
+```bash
+sudo mkdir -p /data/k8s-local-storage/postgres /data/k8s-local-storage/redis
+sudo chown -R 1001:1001 /data/k8s-local-storage/postgres /data/k8s-local-storage/redis
+```
+
+### 1.2 创建 StorageClass 和 PersistentVolume
+
+#### StorageClass（local-storage）
+`local-storage-sc.yaml`：
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
+#### PersistentVolume（以 PostgreSQL、Redis 为例）
+`postgres-pv.yaml`：
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage
+  local:
+    path: /data/k8s-local-storage/postgres
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - lsyzt
+```
+
+`redis-pv.yaml`：
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage
+  local:
+    path: /data/k8s-local-storage/redis
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - lsyzt
+```
+
+#### 应用配置
+```bash
+kubectl apply -f local-storage-sc.yaml
+kubectl apply -f postgres-pv.yaml
+kubectl apply -f redis-pv.yaml
+```
+
+#### 验证
+```bash
+kubectl get storageclass
+kubectl get pv
+```
+
+---
+
+## 2. 安装 Helm
+
+```bash
+# 安装 Helm（如未安装）
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > $null
+sudo apt-get install apt-transport-https --yes
+"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+```
+
+---
+
+## 3. 部署核心数据库服务（PostgreSQL、Redis）
+
+### 3.1 PostgreSQL 部署
+
+1. 创建本地存储目录（如未创建） :
+   ```bash
+   sudo mkdir -p /data/k8s-local-storage/postgres
+   sudo chown -R 1001:1001 /data/k8s-local-storage/postgres
+   ```
+2. 创建 PV（postgres-pv.yaml） :
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: postgres-pv
+   spec:
+     capacity:
+       storage: 10Gi
+     accessModes:
+       - ReadWriteOnce
+     persistentVolumeReclaimPolicy: Retain
+     storageClassName: local-storage
+     local:
+       path: /data/k8s-local-storage/postgres
+     nodeAffinity:
+       required:
+         nodeSelectorTerms:
+           - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                   - lsyzt
+   ```
+   ```bash
+   kubectl apply -f postgres-pv.yaml
+   ```
+3. 创建 postgresql-values.yaml :
+   ```yaml
+global:
+  storageClass: "local-storage"
+primary:
+  persistence:
+    size: 10Gi
+auth:
+  postgresPassword: "ai-platform-2024"
+  username: "aiuser"
+  password: "aiuser-2024"
+  database: "ai_platform"
+   ```
+4. 离线安装 Chart 包（如无网络） :
+   - 在 Windows下载 postgresql-15.5.2.tgz 并上传到服务器。
+5. 安装 PostgreSQL :
+   ```bash
+   kubectl create namespace database
+   helm install postgresql ./postgresql-15.5.2.tgz -f postgresql-values.yaml -n database --create-namespace
+   ```
+6. 镜像拉取失败时，需在服务器用 Docker Desktop/WSL2 离线下载镜像并导入 containerd :
+   ```bash
+   sudo ctr -n k8s.io images import postgresql-16.3.0-debian-12-r12.tar
+   kubectl delete pod postgresql-0 -n database
+   ```
+7. 验证 :
+   ```bash
+   kubectl get pods -n database
+   kubectl get pvc -n database
+   kubectl get pv
+   ```
+
+### 3.2 Redis 部署
+
+1. 创建本地存储目录（如未创建） :
+   ```bash
+   sudo mkdir -p /data/k8s-local-storage/redis
+   sudo chown -R 1001:1001 /data/k8s-local-storage/redis
+   ```
+2. 创建 PV（redis-pv.yaml） :
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: redis-pv
+   spec:
+     capacity:
+       storage: 5Gi
+     accessModes:
+       - ReadWriteOnce
+     persistentVolumeReclaimPolicy: Retain
+     storageClassName: local-storage
+     local:
+       path: /data/k8s-local-storage/redis
+     nodeAffinity:
+       required:
+         nodeSelectorTerms:
+           - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                   - lsyzt
+   ```
+   ```bash
+   kubectl apply -f redis-pv.yaml
+   ```
+3. 创建 redis-values.yaml :
+   ```yaml
+global:
+  storageClass: "local-storage"
+master:
+  persistence:
+    size: 5Gi
+auth:
+  enabled: true
+  password: "redis-2024"
+replica:
+  replicaCount: 0
+   ```
+4. 离线安装 Chart 包（如无网络） :
+   - 在 Windows下载 redis-18.1.2.tgz 并上传到服务器。
+5. 安装 Redis :
+   ```bash
+   helm install redis ./redis-18.1.2.tgz -f redis-values.yaml -n database
+   ```
+6. 镜像拉取失败时，需在服务器用 Docker Desktop/WSL2 离线下载镜像并导入 containerd :
+   ```bash
+   sudo ctr -n k8s.io images import redis-7.2.1-debian-11-r0.tar
+   kubectl delete pod redis-master-0 -n database
+   ```
+7. 验证 :
+   ```bash
+   kubectl get pods -n database
+   kubectl get pvc -n database
+   kubectl get pv
+   ```
+
+> 说明：如需 Redis 副本，请为每个副本单独创建 PV，并将 replicaCount 设置为对应数量。
+
+---
+
+## 4. 高级存储系统与监控（可选/后续）
+
+> 以下为 Harbor、MinIO、OpenSearch、Prometheus 等高级组件部署，建议在核心数据库服务部署并验证无误后再逐步实施。
+
+### 4.1 Harbor (容器镜像仓库)
 
 **推荐部署方式**: 使用 Helm Chart 在 Kubernetes 中部署 Harbor。
 
@@ -105,103 +345,225 @@
 ```
 (参考官方文档: [https://goharbor.io/docs/latest/install-config/install-harbor-by-helm-chart/](https://goharbor.io/docs/latest/install-config/install-harbor-by-helm-chart/))
 
-### 4.2. 日志数据存储与分析
+### 4.2. 日志与监控系统部署（Prometheus/Grafana 本地离线部署，OpenSearch 仅模板）
 
-#### 4.2.1. Prometheus (监控与告警)
-**推荐部署方式**: 使用 `kube-prometheus-stack` Helm Chart 在 Kubernetes 中部署。
+本节聚焦 Prometheus/Grafana 监控栈的本地/离线部署与实际问题排查，所有步骤与实际部署完全一致，便于复现和维护。OpenSearch 仅保留标准模板，后续如需实际部署请补充详细步骤。
 
-**前提**:
-- Kubernetes 集群已运行。
-- Helm 3 已安装。
+##### 4.2.1 Prometheus/Grafana 监控栈（本地/离线部署最佳实践）
 
-**安装步骤 (使用 `kube-prometheus-stack` Helm Chart):**
-1.  添加 Prometheus Community Helm 仓库:
-    ```bash
-    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-    helm repo update
-    ```
-2.  准备 `prometheus-values.yaml` (可选，用于自定义配置)。
-    例如，配置 Grafana 的 Ingress、持久化存储等。
-    ```yaml
-    # prometheus-values.yaml (示例)
-    grafana:
-      enabled: true
-      adminPassword: "YourGrafanaPassword" # 修改密码
-      ingress:
-        enabled: true
-        hosts:
-          - grafana.yourdomain.com # 替换为您的域名
-        # ingressClassName: nginx # 如果需要
-    prometheus:
-      prometheusSpec:
-        storageSpec:
-          volumeClaimTemplate:
-            spec:
-              storageClassName: your-storage-class # 替换为您的 StorageClass
-              accessModes: ["ReadWriteOnce"]
-              resources:
-                requests:
-                  storage: 50Gi
-    alertmanager:
-      alertmanagerSpec:
-        storage:
-          volumeClaimTemplate:
-            spec:
-              storageClassName: your-storage-class # 替换为您的 StorageClass
-              accessModes: ["ReadWriteOnce"]
-              resources:
-                requests:
-                  storage: 10Gi
-    ```
-3.  部署 `kube-prometheus-stack`:
-    ```bash
-    # 创建命名空间 (推荐)
-    kubectl create namespace monitoring
-    # 安装
-    helm install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml -n monitoring --create-namespace
-    ```
-(参考官方文档: [https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack))
+**推荐方式**：使用 kube-prometheus-stack Helm Chart，结合本地 PV、本地离线包和镜像导入，确保离线环境可用。
 
-#### 4.2.2. OpenSearch 和 OpenSearch Dashboards (替代 ELK Stack)
-**推荐部署方式**: 使用 Helm Chart 在 Kubernetes 中部署。
+**实际部署流程**：
+1. **准备本地存储目录与 PV**（以主节点 lsyzt 为例，路径与主机名请按实际情况调整）：
+   ```bash
+   sudo mkdir -p /data/k8s-local-storage/prometheus /data/k8s-local-storage/alertmanager /data/k8s-local-storage/grafana
+   sudo chown -R 1000:1000 /data/k8s-local-storage/prometheus /data/k8s-local-storage/alertmanager /data/k8s-local-storage/grafana
+   ```
+   分别创建 PV（示例）：
+   - `prometheus-pv.yaml`：
+     ```yaml
+     apiVersion: v1
+     kind: PersistentVolume
+     metadata:
+       name: prometheus-pv
+     spec:
+       capacity:
+         storage: 50Gi
+       accessModes:
+         - ReadWriteOnce
+       storageClassName: local-storage
+       local:
+         path: /data/k8s-local-storage/prometheus
+       nodeAffinity:
+         required:
+           nodeSelectorTerms:
+             - matchExpressions:
+                 - key: kubernetes.io/hostname
+                   operator: In
+                   values:
+                     - lsyzt
+     ```
+   - `alertmanager-pv.yaml`、`grafana-pv.yaml` 类似，路径和容量按需调整。
+   
+   应用 PV：
+   ```bash
+   kubectl apply -f prometheus-pv.yaml
+   kubectl apply -f alertmanager-pv.yaml
+   kubectl apply -f grafana-pv.yaml
+   ```
 
-**许可证提醒**: OpenSearch (Apache 2.0 许可证) 是推荐的替代方案。
+2. **准备 StorageClass**（如未创建） :
+   ```yaml
+   # local-storage-sc.yaml
+   apiVersion: storage.k8s.io/v1
+   kind: StorageClass
+   metadata:
+     name: local-storage
+   provisioner: kubernetes.io/no-provisioner
+   volumeBindingMode: WaitForFirstConsumer
+   ```
+   ```bash
+   kubectl apply -f local-storage-sc.yaml
+   ```
 
-**安装步骤 (使用 OpenSearch Helm Chart):**
-1.  添加 OpenSearch Helm 仓库:
-    ```bash
-    helm repo add opensearch https://opensearch-project.github.io/helm-charts/
-    helm repo update
-    ```
-2.  准备 `opensearch-values.yaml` (可选，用于自定义配置)。
-    关键配置包括持久化、副本数、资源限制等。
-    ```yaml
-    # opensearch-values.yaml (简化示例)
-    clusterName: "opensearch-cluster"
-    nodeGroup: "master" # 示例，可以配置多个节点组 (master, data, client)
-    replicas: 1 # 用于演示，生产环境至少3个 master, 多个 data 节点
-    persistence:
-      enabled: true
-      storageClass: "your-storage-class" # 替换
-      size: "20Gi"
-    # opensearchDashboards.enabled: true (通常 Helm chart 会包含 Dashboards)
-    # opensearchDashboards.replicas: 1
-    # opensearchDashboards.persistence.enabled: true
-    # opensearchDashboards.persistence.storageClass: "your-storage-class"
-    # opensearchDashboards.ingress.enabled: true
-    # opensearchDashboards.ingress.hosts[0].host: opensearch.yourdomain.com
-    # opensearchDashboards.ingress.hosts[0].path: /
-    ```
-3.  部署 OpenSearch (通常包含 OpenSearch Dashboards):
-    ```bash
-    # 创建命名空间
-    kubectl create namespace logging
-    # 安装 (通常一个 chart 会同时部署 OpenSearch 和 OpenSearch Dashboards)
-    helm install opensearch opensearch/opensearch -f opensearch-values.yaml -n logging --create-namespace
-    # 如果 Dashboards 是分开的 chart:
-    # helm install opensearch-dashboards opensearch/opensearch-dashboards -f dashboards-values.yaml -n logging
-    ```
-(参考官方文档: [https://opensearch.org/docs/latest/opensearch/install/helm/](https://opensearch.org/docs/latest/opensearch/install/helm/))
+3. **准备 prometheus-values.yaml**（与实际一致，示例） :
+   ```yaml
+   grafana:
+     enabled: true
+     adminPassword: "minioadmin123" # 示例密码，实际以文档整理为准
+     persistence:
+       enabled: true
+       storageClassName: local-storage
+       size: 10Gi
+     ingress:
+       enabled: false # 如需 Ingress 按需开启
+   prometheus:
+     prometheusSpec:
+       storageSpec:
+         volumeClaimTemplate:
+           spec:
+             storageClassName: local-storage
+             accessModes: ["ReadWriteOnce"]
+             resources:
+               requests:
+                 storage: 50Gi
+   alertmanager:
+     alertmanagerSpec:
+       storage:
+         volumeClaimTemplate:
+           spec:
+             storageClassName: local-storage
+             accessModes: ["ReadWriteOnce"]
+             resources:
+               requests:
+                 storage: 10Gi
+   ```
+
+4. **离线包与镜像导入** :
+   - 上传 `kube-prometheus-stack-73.2.0.tgz` 到服务器。
+   - 镜像拉取失败时，需在本地下载相关镜像（如 `quay.io/prometheus/prometheus`、`grafana/grafana` 等），导出为 tar 包后上传服务器并导入 containerd：
+     ```bash
+     sudo ctr -n k8s.io images import prometheus-v2.51.2.tar
+     sudo ctr -n k8s.io images import grafana-10.2.3.tar
+     # 依次导入所有所需镜像
+     # 镜像导入后，重启拉取失败的 Pod
+     kubectl delete pod <pod-name> -n monitoring
+     ```
+
+5. **安装 kube-prometheus-stack** :
+   ```bash
+   kubectl create namespace monitoring
+   helm install prometheus ./kube-prometheus-stack-73.2.0.tgz -f prometheus-values.yaml -n monitoring --create-namespace
+   ```
+
+6. **常见问题排查** :
+   - Pod 卡在 `ImagePullBackOff`：确认镜像已导入 containerd，重启 Pod。
+   - PVC 卡在 `Pending`：检查 PV 是否与 PVC 匹配（storageClass、容量、主机名等），`kubectl describe pvc/pv` 查看详细原因。
+   - 端口转发访问 Grafana：
+     ```bash
+     kubectl port-forward svc/prometheus-grafana 3000:80 -n monitoring
+     # 浏览器访问 http://localhost:3000
+     ```
+   - 账号密码见文档整理表。
+
+7. **验证** :
+   ```bash
+   kubectl get pods -n monitoring
+   kubectl get pvc -n monitoring
+   kubectl get pv
+   ```
+
+> 详细部署与排查流程已在本节覆盖，所有配置与实际部署保持一致。
+
+##### 4.2.2 OpenSearch 日志系统（本地/离线部署实操）
+
+本节以实际离线部署为例，详细说明 OpenSearch 在本地 Kubernetes 集群的完整部署流程，包括本地存储、离线镜像导入、PV/PVC 配置与常见问题排查。
+
+**部署步骤如下：**
+
+1. **准备本地存储目录与 PV**
+   ```bash
+   sudo mkdir -p /data/k8s-local-storage/opensearch
+   sudo chown -R 1000:1000 /data/k8s-local-storage/opensearch
+   ```
+   新建 `opensearch-pv.yaml`：
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: opensearch-pv
+   spec:
+     capacity:
+       storage: 20Gi
+     accessModes:
+       - ReadWriteOnce
+     storageClassName: local-storage
+     local:
+       path: /data/k8s-local-storage/opensearch
+     nodeAffinity:
+       required:
+         nodeSelectorTerms:
+           - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                   - lsyzt
+   ```
+   应用 PV：
+   ```bash
+   kubectl apply -f opensearch-pv.yaml
+   ```
+
+2. **准备 opensearch-values.yaml**（示例）
+   ```yaml
+   clusterName: "opensearch-cluster"
+   nodeGroup: "master"
+   replicas: 1
+   persistence:
+     enabled: true
+     storageClass: "local-storage"
+     size: "20Gi"
+   # 如需 Dashboards、账号密码等可补充
+   ```
+
+3. **离线下载并导入镜像**
+   - 在有网络的主机（如 Windows）拉取并导出主镜像和 Init 容器镜像：
+     ```powershell
+     docker pull opensearchproject/opensearch:3.0.0
+     docker save opensearchproject/opensearch:3.0.0 -o opensearch-3.0.0.tar
+     docker pull busybox:latest
+     docker save busybox:latest -o busybox-latest.tar
+     ```
+   - 上传 `opensearch-3.0.0.tar` 和 `busybox-latest.tar` 到服务器。
+   - 在服务器导入镜像：
+     ```bash
+     sudo ctr -n k8s.io images import opensearch-3.0.0.tar
+     sudo ctr -n k8s.io images import busybox-latest.tar
+     ```
+
+4. **安装 OpenSearch**
+   ```bash
+   kubectl create namespace logging
+   helm install opensearch ./opensearch-3.0.0.tgz -f opensearch-values.yaml -n logging --create-namespace
+   ```
+
+5. **验证与排查**
+   - 查看 Pod、PVC、PV 状态：
+     ```bash
+     kubectl get pods -n logging
+     kubectl get pvc -n logging
+     kubectl get pv
+     ```
+   - 如 Pod 卡在 `Init:ErrImagePull` 或 `ImagePullBackOff`，请用如下命令定位缺失镜像：
+     ```bash
+     kubectl describe pod -n logging opensearch-cluster-master-0
+     ```
+     按需补充导入所有报错的镜像，导入后删除 Pod 让其自动重建。
+   - 如 PVC 卡在 Pending，检查 PV 与 PVC 的 storageClass、容量、主机名等是否一致。
+
+> 说明：OpenSearch 离线部署时，所有用到的镜像（主容器和 Init 容器）都需提前导入。遇到镜像拉取失败，务必先用 `kubectl describe pod` 查明缺失镜像并补齐。
+
+---
 
 ### 4.3. 容器持久化数据
 
@@ -295,3 +657,16 @@
   - Calico 通常使用 Kubernetes etcd 或其自带的 etcd 作为数据存储。
   - Cilium 也可以使用 Kubernetes etcd 或其他键值存储。
   - 这些通常作为 CNI 插件安装和配置的一部分进行处理，不需要单独部署存储系统。
+
+---
+
+## 账号与密码整理（部署默认/示例配置）
+
+| 组件         | 用户名         | 密码              | 说明                  |
+|--------------|----------------|-------------------|-----------------------|
+| PostgreSQL   | postgres       | ai-platform-2024  | 管理员，Helm values   |
+| PostgreSQL   | aiuser         | aiuser-2024       | 普通用户，Helm values |
+| Redis        | (无用户名)     | redis-2024        | Helm values           |
+| MinIO        | minioadmin     | minioadmin123     | minio-values.yaml     |
+
+> 说明：如有自定义 values.yaml，请以实际配置为准。生产环境建议修改所有默认密码！
