@@ -666,39 +666,85 @@ replica:
 
 > 说明：所有用到的镜像需提前导入，遇到镜像拉取失败，务必先用 `kubectl describe pod` 查明缺失镜像并补齐。账号密码建议同步到“账号与密码整理”表格，便于后续管理。
 
-#### 4.3.2. PostgreSQL (关系型数据库)
-**版本**: 16
-**推荐部署方式**: 使用 PostgreSQL Operator (如 Crunchy Data, Zalando) 或 Bitnami PostgreSQL HA Helm Chart 在 Kubernetes 中部署。
+#### 4.3.2 PostgreSQL (关系型数据库，离线/本地部署实操)
 
-**安装步骤 (使用 Bitnami PostgreSQL HA Helm Chart 示例):**
-1.  添加 Bitnami Helm 仓库 (如果尚未添加):
-    ```bash
-    helm repo add bitnami https://charts.bitnami.com/bitnami
-    helm repo update
-    ```
-2.  准备 `postgresql-values.yaml`。
-    ```yaml
-    # postgresql-values.yaml (HA 简化示例)
-    global:
-      storageClass: "your-storage-class" # 替换
-    # postgresqlUsername: your_user
-    # postgresqlPassword: "YourStrongPassword" # 修改
-    # postgresqlDatabase: your_db
-    primary:
-      persistence:
-        size: 20Gi
-    readReplicas:
-      replicas: 1 # 可选的读副本
-      persistence:
-        size: 20Gi
-    ```
-3.  部署 PostgreSQL HA:
-    ```bash
-    # 创建命名空间
-    kubectl create namespace database
-    # 安装
-    helm install postgresql-ha bitnami/postgresql-ha -f postgresql-values.yaml -n database --create-namespace
-    ```
+本节描述实际已部署的 PostgreSQL 单节点配置，所有步骤与实际操作一致，便于复现和维护。
+
+**实际部署配置：**
+- **版本**: PostgreSQL 16
+- **部署方式**: Bitnami PostgreSQL Helm Chart (单节点)
+- **存储**: 本地 PV (10Gi)
+
+**实际部署步骤如下：**
+
+1. **准备本地存储目录与 PV**（已完成）
+   ```bash
+   sudo mkdir -p /data/k8s-local-storage/postgres
+   sudo chown -R 1001:1001 /data/k8s-local-storage/postgres
+   ```
+
+2. **创建 postgres-pv.yaml**（已完成）
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: postgres-pv
+   spec:
+     capacity:
+       storage: 10Gi
+     accessModes:
+       - ReadWriteOnce
+     persistentVolumeReclaimPolicy: Retain
+     storageClassName: local-storage
+     local:
+       path: /data/k8s-local-storage/postgres
+     nodeAffinity:
+       required:
+         nodeSelectorTerms:
+           - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                   - lsyzt
+   ```
+
+3. **实际 postgresql-values.yaml 配置**
+   ```yaml
+   global:
+     storageClass: "local-storage"
+   primary:
+     persistence:
+       size: 10Gi
+   auth:
+     postgresPassword: "ai-platform-2024"
+     username: "aiuser"
+     password: "aiuser-2024"
+     database: "ai_platform"
+   ```
+
+4. **安装 PostgreSQL**（已完成）
+   ```bash
+   kubectl create namespace database
+   helm install postgresql ./postgresql-15.5.2.tgz -f postgresql-values.yaml -n database --create-namespace
+   ```
+
+5. **验证部署状态**
+   ```bash
+   kubectl get pods -n database
+   kubectl get pvc -n database
+   kubectl get pv | grep postgres
+   kubectl get svc -n database
+   ```
+
+6. **连接测试**（可选）
+   ```bash
+   # 端口转发访问 PostgreSQL
+   kubectl port-forward svc/postgresql 5432:5432 -n database
+   # 在另一个终端连接数据库
+   psql -h localhost -U aiuser -d ai_platform
+   ```
+
+> 说明：当前部署为单节点配置，生产环境如需高可用可考虑 PostgreSQL HA Chart。所有账号密码已记录在文档末尾的整理表中。
 (旧的独立安装方式，仅供参考)
 ```bash
 # sudo apt update

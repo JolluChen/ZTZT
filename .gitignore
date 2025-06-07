@@ -50,9 +50,15 @@ htmlcov/
 
 # vscode
 .vscode/
+
+# Binary archives and packages
+*.tar
+*.tgz
+*.tar.gz
+*.zip
+*.tar.bz2
+*.tar.xz
+
 # Specific to this project (if any)
 # e.g., local configuration files not meant for sharing
 # local_settings.py
-
-postgresql-15.5.2.tgz
-redis-18.1.2.tgz
