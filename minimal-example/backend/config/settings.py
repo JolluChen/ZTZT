@@ -111,7 +111,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = 'zh-hans'
+LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Shanghai'
 USE_I18N = True
 USE_TZ = True
@@ -192,3 +192,9 @@ LOGGING = {
 
 # 确保日志目录存在
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
+
+# 临时禁用国际化以解决语言包问题
+USE_I18N = False
+USE_L10N = False
+USE_TZ = True
+LANGUAGE_CODE = 'en-us'

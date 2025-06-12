@@ -1109,7 +1109,7 @@ volumes:
 EOF
 
 # 启动集群
-docker-compose -f /tmp/redis-cluster-compose.yml up -d
+docker compose -f /tmp/redis-cluster-compose.yml up -d
 
 # 验证集群状态
 docker exec redis-sentinel redis-cli -p 26379 sentinel masters

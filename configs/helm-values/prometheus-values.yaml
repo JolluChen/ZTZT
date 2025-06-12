@@ -1,0 +1,28 @@
+grafana:
+  enabled: true
+  adminPassword: "grafanaadmin123" # 修改密码
+  ingress:
+    enabled: false
+      # hosts:
+      # - grafana.yourdomain.com # 替换为您的域名
+    # ingressClassName: nginx # 如果需要
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-storage # 替换为您的 StorageClass
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-storage # 替换为您的 StorageClass
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi

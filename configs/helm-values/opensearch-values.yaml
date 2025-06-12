@@ -1,0 +1,10 @@
+clusterName: "opensearch-cluster"
+nodeGroup: "master"
+replicas: 1
+persistence:
+  enabled: true
+  storageClass: "local-storage"
+  size: "20Gi"
+extraEnvs:
+  - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    value: "OPENsearch@123"

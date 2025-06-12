@@ -1,0 +1,10 @@
+global:
+  storageClass: "local-storage"
+primary:
+  persistence:
+    size: 10Gi
+auth:
+  postgresPassword: "ai-platform-2024"
+  username: "aiuser"
+  password: "aiuser-2024"
+  database: "ai_platform"

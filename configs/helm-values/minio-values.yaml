@@ -1,0 +1,7 @@
+mode: standalone
+accessKey: "minioadmin"
+secretKey: "minioadmin123"
+persistence:
+  enabled: true
+  storageClass: "local-storage"
+  size: 50Gi

@@ -1,0 +1,180 @@
+version: '3.8'
+
+# 轻量级Docker Compose配置 - 使用更容易获取的镜像
+# 解决网络连接问题的备选方案
+
+services:
+  # PostgreSQL数据库 - 使用官方轻量镜像
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-platform-postgres-lite
+    environment:
+      POSTGRES_DB: ai_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_lite:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis缓存 - 轻量级版本
+  redis:
+    image: redis:7-alpine
+    container_name: ai-platform-redis-lite
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_lite:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Django后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: ai-platform-backend-lite
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/ai_platform
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    restart: unless-stopped
+
+  # 简化版Nginx - 使用alpine版本
+  nginx:
+    image: nginx:alpine
+    container_name: ai-platform-nginx-lite
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./frontend/build:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # 基础监控 - 使用轻量级Prometheus
+  prometheus-lite:
+    image: prom/prometheus:v2.45.0
+    container_name: ai-platform-prometheus-lite
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus-lite.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data_lite:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # 轻量级Grafana
+  grafana-lite:
+    image: grafana/grafana:10.0.0
+    container_name: ai-platform-grafana-lite
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data_lite:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - prometheus-lite
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # 简化版MinIO - 对象存储
+  minio-lite:
+    image: minio/minio:RELEASE.2023-09-04T19-57-37Z
+    container_name: ai-platform-minio-lite
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    volumes:
+      - minio_data_lite:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    profiles:
+      - storage
+
+  # 模拟推理服务 - 不依赖NVIDIA镜像
+  mock-inference:
+    image: python:3.9-slim
+    container_name: ai-platform-mock-inference
+    ports:
+      - "8100:8000"
+    volumes:
+      - ./mock-inference:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install fastapi uvicorn requests &&
+             python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    profiles:
+      - inference
+
+volumes:
+  postgres_data_lite:
+    driver: local
+  redis_data_lite:
+    driver: local
+  prometheus_data_lite:
+    driver: local
+  grafana_data_lite:
+    driver: local
+  minio_data_lite:
+    driver: local
+
+networks:
+  default:
+    name: ai-platform-lite
+    driver: bridge

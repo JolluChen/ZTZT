@@ -5,22 +5,38 @@
 
 # Python virtual environment
 .venv/
+venv/
+env/
+ENV/
 
 # Python bytecode
 __pycache__/
 *.py[cod]
+*$py.class
 
 # Distribution / packaging
 .Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
 *.egg
+MANIFEST
 
 # Logs and databases
 *.log
 *.sql
 *.sqlite3
+*.db
 
 # OS generated files
 .DS_Store
@@ -28,8 +44,36 @@ Thumbs.db
 
 # Secrets and credentials - Be careful not to commit these!
 *.env
+.env.*
+!.env.example
 secrets/
 credentials.json
+config/local_settings.py
+
+# Node.js dependencies and build outputs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+.nyc_output
+
+# Frontend build outputs
+.next/
+out/
+dist/
+build/
+
+# TypeScript cache
+*.tsbuildinfo
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
@@ -49,6 +93,9 @@ htmlcov/
 .tox/
 
 # vscode
+
+# Packages directory with large binary files
+packages/
 .vscode/
 
 # Binary archives and packages
@@ -62,3 +109,128 @@ htmlcov/
 # Specific to this project (if any)
 # e.g., local configuration files not meant for sharing
 # local_settings.py
+
+# ===========================================
+# minimal-example Project Specific Ignores
+# ===========================================
+
+# Backend Python environment and dependencies
+minimal-example/backend/venv/
+minimal-example/backend/.venv/
+minimal-example/backend/env/
+minimal-example/backend/ENV/
+minimal-example/backend/__pycache__/
+minimal-example/backend/**/*.pyc
+minimal-example/backend/**/*.pyo
+minimal-example/backend/**/*.pyd
+minimal-example/backend/.Python
+minimal-example/backend/pip-log.txt
+minimal-example/backend/pip-delete-this-directory.txt
+
+# Backend databases and logs
+minimal-example/backend/db.sqlite3
+minimal-example/backend/db.sqlite3-*
+minimal-example/backend/logs/
+minimal-example/backend/**/*.log
+minimal-example/backend/media/
+minimal-example/backend/staticfiles/
+
+# Backend local settings and secrets
+minimal-example/backend/config/local_settings.py
+minimal-example/backend/config/production_settings.py
+minimal-example/backend/.env
+minimal-example/backend/.env.*
+!minimal-example/backend/.env.example
+
+# Frontend Node.js dependencies and build
+minimal-example/frontend/node_modules/
+minimal-example/frontend/.next/
+minimal-example/frontend/out/
+minimal-example/frontend/dist/
+minimal-example/frontend/build/
+minimal-example/frontend/.nuxt/
+minimal-example/frontend/.vuepress/dist
+
+# Frontend logs and debug
+minimal-example/frontend/npm-debug.log*
+minimal-example/frontend/yarn-debug.log*
+minimal-example/frontend/yarn-error.log*
+minimal-example/frontend/lerna-debug.log*
+
+# Frontend cache and temporary files
+minimal-example/frontend/.cache/
+minimal-example/frontend/.parcel-cache/
+minimal-example/frontend/.nyc_output
+minimal-example/frontend/.eslintcache
+minimal-example/frontend/*.tsbuildinfo
+
+# Frontend environment variables
+minimal-example/frontend/.env
+minimal-example/frontend/.env.*
+!minimal-example/frontend/.env.example
+!minimal-example/frontend/.env.local.example
+
+# Frontend coverage and test reports
+minimal-example/frontend/coverage/
+minimal-example/frontend/.nyc_output/
+minimal-example/frontend/test-results/
+
+# Storybook build outputs
+minimal-example/frontend/storybook-static
+
+# Runtime and deployment files
+*.pid
+*.sock
+*.lock
+
+# Data directories (runtime data should not be committed)
+minimal-example/data/
+minimal-example/logs/
+minimal-example/model-repository/*/
+!minimal-example/model-repository/*/model_config.pbtxt
+!minimal-example/model-repository/*/config.pbtxt
+
+# Environment files (real environment files, not examples)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+backend/.env
+frontend/.env.local
+
+# Monitoring data
+monitoring/prometheus/data/
+monitoring/grafana/data/
+monitoring/alertmanager/data/
+
+# Cache directories
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE and system files
+.vscode/settings.json
+.vscode/launch.json
+*.iml
+
+# Docker volumes and build contexts
+.docker/
+docker-compose.override.yml
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Security and secrets
+secrets.yml
+credentials/
+keys/
+certs/
+*.pem
+*.key
+*.crt

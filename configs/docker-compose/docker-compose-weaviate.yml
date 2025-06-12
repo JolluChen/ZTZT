@@ -1,0 +1,46 @@
+version: '3.4'
+services:
+  weaviate:
+    image: semitechnologies/weaviate:1.22.4
+    container_name: weaviate
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+      - "50051:50051"  # gRPC port
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "false"
+      AUTHENTICATION_APIKEY_ENABLED: "true"
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: "changeThisToSecurePassword"  # 请替换为安全的 API 密钥
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: text2vec-transformers
+      ENABLE_MODULES: text2vec-transformers,img2vec-neural,generative-openai
+      CLUSTER_HOSTNAME: "node1"
+    depends_on:
+      - t2v-transformers
+      - img2vec-neural
+
+  t2v-transformers:
+    image: semitechnologies/transformers-inference:sentence-transformers-multilingual-e5-large
+    container_name: t2v-transformers
+    restart: unless-stopped
+    environment:
+      ENABLE_CUDA: "0"  # 设置为 1 启用 GPU
+      NVIDIA_VISIBLE_DEVICES: "all"  # 使用 GPU 时需要
+    volumes:
+      - transformer_cache:/root/.cache
+      
+  img2vec-neural:
+    image: semitechnologies/img2vec-neural:resnet50
+    container_name: img2vec-neural
+    restart: unless-stopped
+    environment:
+      ENABLE_CUDA: "0"  # 设置为 1 启用 GPU
+
+volumes:
+  weaviate_data:
+    driver: local
+  transformer_cache:
+    driver: local

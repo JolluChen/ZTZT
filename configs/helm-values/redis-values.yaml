@@ -1,0 +1,10 @@
+global:
+  storageClass: "local-storage"
+master:
+  persistence:
+    size: 5Gi
+auth:
+  enabled: true
+  password: "redis-2024"
+replica:
+  replicaCount: 0
