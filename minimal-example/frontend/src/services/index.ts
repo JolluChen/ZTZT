@@ -19,7 +19,12 @@ import {
 // 认证服务
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
+    console.log('🔐 AuthService: 发送登录请求到:', API_ENDPOINTS.AUTH.LOGIN); // 调试日志
+    console.log('🔐 AuthService: 请求数据:', credentials); // 调试日志
+    
     const response = await api.post(API_ENDPOINTS.AUTH.LOGIN, credentials);
+    
+    console.log('🔐 AuthService: 响应数据:', response.data); // 调试日志
     return response.data;
   },
 

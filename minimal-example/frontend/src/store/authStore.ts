@@ -29,7 +29,9 @@ export const useAuthStore = create<AuthState>()(
       login: async (username: string, password: string) => {
         try {
           set({ isLoading: true });
+          console.log('AuthStore: 发送登录请求...'); // 调试日志
           const response = await authService.login({ username, password });
+          console.log('AuthStore: 登录响应:', response); // 调试日志
           
           // 保存token到localStorage
           localStorage.setItem('token', response.token);
@@ -40,7 +42,18 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
-        } catch (error) {
+        } catch (error: any) {
+          console.error('AuthStore: 登录错误:', error); // 调试日志
+          
+          // 增强错误信息
+          if (error.code === 'ERR_NETWORK') {
+            console.error('🚫 网络连接失败 - 可能的原因:');
+            console.error('1. 后端服务未启动');
+            console.error('2. API地址配置错误');
+            console.error('3. 网络连接问题');
+            console.error('4. 跨域配置问题');
+          }
+          
           set({ isLoading: false });
           throw error;
         }

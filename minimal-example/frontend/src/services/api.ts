@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { message } from 'antd';
 
 // 创建axios实例
 const api: AxiosInstance = axios.create({
@@ -10,13 +9,30 @@ const api: AxiosInstance = axios.create({
   },
 });
 
+// 仅在开发环境输出API地址
+if (process.env.NODE_ENV === 'development') {
+  console.log('🌐 API Base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api');
+}
+
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
+    // 仅在开发环境且启用调试时输出详细请求信息
+    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEBUG === 'true') {
+      console.log('🌐 API 请求:', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        fullURL: `${config.baseURL}${config.url}`,
+      });
+    }
+    
     // 添加认证token
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Token ${token}`;
+      if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEBUG === 'true') {
+        console.log('🔑 添加 Token');
+      }
     }
     
     // 添加CSRF保护
@@ -32,6 +48,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('🚫 API 请求错误:', error);
     return Promise.reject(error);
   }
 );
@@ -39,42 +56,56 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    // 仅在开发环境且启用调试时输出响应信息
+    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEBUG === 'true') {
+      console.log('✅ API 响应:', {
+        status: response.status,
+        url: response.config.url,
+      });
+    }
     return response;
   },
   (error: AxiosError) => {
+    // 仅在开发环境或发生错误时输出错误信息
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ API 响应错误:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+    }
+    
     const { response } = error;
     
     if (response) {
       switch (response.status) {
         case 401:
-          // 未认证，清除token并跳转到登录页
+          // 未认证，清除token
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.location.href = '/auth/login';
-          message.error('登录已过期，请重新登录');
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('🔑 Token 已过期，清除本地存储');
+          }
           break;
         case 403:
-          message.error('没有权限执行此操作');
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('🚫 权限不足');
+          }
           break;
         case 404:
-          message.error('请求的资源不存在');
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('❓ 资源不存在');
+          }
           break;
         case 500:
-          message.error('服务器内部错误，请稍后重试');
+          console.error('💥 服务器内部错误');
           break;
-        default:
-          if (response.data?.detail) {
-            message.error(response.data.detail);
-          } else if (response.data?.message) {
-            message.error(response.data.message);
-          } else {
-            message.error('请求失败，请稍后重试');
-          }
       }
     } else if (error.code === 'ECONNABORTED') {
-      message.error('请求超时，请检查网络连接');
+      console.error('⏰ 请求超时');
     } else {
-      message.error('网络错误，请检查网络连接');
+      console.error('🌐 网络错误');
     }
     
     return Promise.reject(error);
