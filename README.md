@@ -19,6 +19,22 @@ ZTZT 是一个企业级的 AI 中台项目，旨在为企业提供完整的人�
 - **📦 模块化设计**: 可按需选择和部署不同模块
 - **🌐 生产就绪**: 支持高可用、负载均衡和自动扩缩容
 
+## 🚪 系统界面截图
+
+> 以下为中台主要界面示例截图：
+
+- 登录页：
+  
+  ![中台登录页](figs/ZT_Launcher.png)
+
+- 首页：
+  
+  ![中台主页](figs/ZT_Home.png)
+
+- Django 后台管理：
+  
+  ![Django Admin](figs/ZT_Admin_Django.png)
+
 ## 📁 项目结构
 
 ```
@@ -156,17 +172,28 @@ helm install prometheus -f configs/helm-values/prometheus-values.yaml prometheus
 
 ### 完整环境服务
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| **PostgreSQL** | 5432 | 主数据库 |
-| **MongoDB** | 27017 | 文档数据库 |
-| **Redis** | 6379 | 缓存服务 |
-| **Kafka** | 9092 | 消息队列 |
-| **MinIO** | 9000/9001 | 对象存储 |
-| **Prometheus** | 9090 | 监控数据收集 |
-| **Grafana** | 3002 | 监控仪表板 |
-| **Triton Server** | 8100 | GPU 推理服务 |
-| **OpenWebUI** | 8080 | LLM 交互界面 |
+| 服务 | 地址 | 账号/密码 | 说明 |
+|------|------|-----------|------|
+| **前端界面** | http://192.168.110.88:3000 | admin / admin123 | 主要的 Web 界面 |
+| **后端 API** | http://192.168.110.88:8000 | - | Django REST API |
+| **API文档** | http://192.168.110.88:8000/swagger/ | - | Swagger API 文档 |
+| **管理后台** | http://192.168.110.88:8000/admin/ | admin / admin123 | Django 管理后台 |
+| **Grafana监控** | http://192.168.110.88:3002 | admin / admin123 | 监控仪表板 |
+| **Prometheus** | http://192.168.110.88:9090 | - | 监控数据收集 |
+| **PostgreSQL** | localhost:5432 | postgres / postgres | 数据库服务 |
+| **Redis** | localhost:6379 | - | 缓存服务 |
+| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin | 对象存储管理界面 |
+| **MinIO API** | http://localhost:9000 | minioadmin / minioadmin | 对象存储 API |
+| **Prometheus** | http://localhost:9090 | - | 监控数据收集 |
+| **Grafana** | http://localhost:3002 | admin / admin123 | 监控仪表板 |
+| **Triton Server HTTP** | http://localhost:8100 | - | GPU 推理服务 HTTP API* |
+| **Triton Server gRPC** | localhost:8001 | - | GPU 推理服务 gRPC API* |
+| **Triton Metrics** | http://localhost:8002 | - | Triton 监控指标* |
+| **OpenWebUI** | http://localhost:8080 | admin / admin123 | LLM 交互界面* |
+| **Ollama API** | http://localhost:11434 | - | LLM API 服务* |
+| **DCGM Exporter** | http://localhost:9400 | - | GPU 监控指标* |
+
+*仅在检测到 GPU 或启用相应 profile 时启动
 
 ## 📚 文档导航
 
