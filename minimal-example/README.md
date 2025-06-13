@@ -31,11 +31,14 @@
 #### ⚡ 快速启动（环境已配置）
 ```bash
 # 快速启动所有服务（适合日常开发）
+# 现已支持自动启动Grafana监控
 ./quick-start.sh
 
 # 停止服务
 ./stop.sh
 ```
+
+> **🎉 新特性**: `quick-start.sh` 现在支持后台运行！服务启动后脚本会自动退出，关闭终端不会影响服务运行。
 
 #### 启动模式选择
 
@@ -93,8 +96,12 @@ minimal-example/
 
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| **前端界面** | http://localhost:3000 | 主要的 Web 界面 |
-| **后端 API** | http://localhost:8000 | Django REST API |
+| **前端界面** | http://192.168.110.88:3000 | 主要的 Web 界面 |
+| **后端 API** | http://192.168.110.88:8000 | Django REST API |
+| **API文档** | http://192.168.110.88:8000/swagger/ | Swagger API 文档 |
+| **管理后台** | http://192.168.110.88:8000/admin/ | Django 管理后台 (admin/admin123) |
+| **Grafana监控** | http://192.168.110.88:3002 | 监控仪表板 (admin/admin123) |
+| **Prometheus** | http://192.168.110.88:9090 | 监控数据收集 |
 | **PostgreSQL** | localhost:5432 | 数据库服务 |
 | **Redis** | localhost:6379 | 缓存服务 |
 | **MinIO Console** | http://localhost:9001 | 对象存储管理界面 (minioadmin/minioadmin) |
@@ -118,6 +125,8 @@ minimal-example/
 - ✅ **模型管理**：支持多种模型格式
 - ✅ **数据管理**：PostgreSQL + Redis + MinIO
 - ✅ **监控系统**：Prometheus + Grafana
+- ✅ **快速部署**：优化的启动脚本，支持后台运行
+- ✅ **实时监控**：自动启动Grafana监控面板
 
 ### GPU 功能（可选）
 - ✅ **GPU 加速推理**：NVIDIA Triton Inference Server
@@ -129,7 +138,9 @@ minimal-example/
 - ✅ **系统监控**：CPU、内存、磁盘使用率
 - ✅ **GPU 监控**：GPU 使用率、显存、温度、功耗
 - ✅ **服务监控**：各服务健康状态和性能指标
-- ✅ **可视化界面**：Grafana 仪表板
+- ✅ **自动化监控**：一键启动 Grafana + Prometheus 监控栈
+- ✅ **可视化界面**：预配置的 Grafana 仪表板
+- ✅ **智能告警**：基于阈值的自动告警系统
 
 ## 📚 使用指南
 
@@ -199,6 +210,12 @@ docker compose restart <service-name>
 # 完整环境开发（需要Docker）
 ./start.sh
 
+# 快速启动（后台运行，推荐）
+./quick-start.sh
+# 注意：quick-start.sh 现在支持后台运行
+# 启动完成后脚本会自动退出，服务继续在后台运行
+# 关闭终端不会影响服务
+
 # 本地开发模式（网络受限/仅后端开发）
 ./start_local.sh
 
@@ -220,9 +237,17 @@ npm run dev
 ### 脚本说明
 
 - `start.sh`: 主启动脚本，自动检测 GPU 并启动相应服务
+- `quick-start.sh`: 快速启动脚本，**现已支持后台运行**，自动启动 Grafana 监控
 - `stop.sh`: 停止脚本，清理容器和网络
 - `scripts/`: 包含各种工具脚本
 - `tests/`: 包含测试和验证脚本
+
+#### quick-start.sh 新特性
+- ✅ **后台运行**: 服务启动后脚本自动退出
+- ✅ **监控集成**: 自动启动 Grafana 监控服务  
+- ✅ **端口检查**: 自动检测并清理端口冲突
+- ✅ **日志记录**: 后端和前端日志保存到 logs/ 目录
+- ✅ **PID 管理**: 进程 ID 保存，便于管理
 
 ## 📖 文档
 
@@ -236,10 +261,32 @@ npm run dev
 
 如果遇到问题，请按以下顺序排查：
 
-1. 检查 Docker 服务是否正常运行
-2. 确认端口没有被占用
-3. 查看容器日志排查具体错误
-4. 检查 GPU 驱动和 Docker GPU 支持
+1. **基础检查**
+   - 检查 Docker 服务是否正常运行
+   - 确认端口没有被占用（3000, 8000, 3002）
+   - 查看容器日志排查具体错误
+   
+2. **监控服务问题**
+   - Grafana 无法访问：检查 http://192.168.110.88:3002
+   - 检查 Grafana 容器状态：`docker ps | grep grafana`
+   - 查看 Grafana 日志：`docker logs ai-platform-grafana`
+
+3. **服务状态检查**
+   ```bash
+   # 检查所有容器状态
+   docker ps
+   
+   # 检查服务日志
+   tail -f logs/backend.log
+   tail -f logs/frontend.log
+   
+   # 重启服务
+   ./stop.sh && ./quick-start.sh
+   ```
+
+4. **GPU相关问题**
+   - 检查 GPU 驱动和 Docker GPU 支持
+   - 运行系统诊断：`bash scripts/diagnose_system.sh`
 
 ## 📄 许可证
 

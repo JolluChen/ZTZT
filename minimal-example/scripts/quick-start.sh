@@ -52,6 +52,9 @@ cleanup() {
         kill $(cat logs/frontend.pid) 2>/dev/null || true
         rm -f logs/frontend.pid
     fi
+    # 停止Grafana容器
+    echo -e "${BLUE}正在停止Grafana...${NC}"
+    cd docker && docker compose -f docker-compose.offline.yml down grafana >/dev/null 2>&1 && cd ..
     echo -e "${GREEN}✅ 服务已停止${NC}"
     exit 0
 }
@@ -64,6 +67,18 @@ echo -e "${BLUE}🔍 检查端口占用情况...${NC}"
 check_and_cleanup_port 8000 "Django后端"
 check_and_cleanup_port 3000 "Next.js前端"
 
+# 启动Grafana监控服务
+echo -e "${YELLOW}📊 步骤0: 启动Grafana监控服务${NC}"
+cd docker
+echo -e "${BLUE}正在启动Grafana...${NC}"
+docker compose -f docker-compose.offline.yml up -d grafana >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Grafana服务已启动${NC}"
+else
+    echo -e "${YELLOW}⚠️  Grafana启动失败或已在运行${NC}"
+fi
+cd ..
+
 # 1. 进入后端目录
 echo -e "${YELLOW}📡 步骤1: 进入后端目录${NC}"
 cd backend
@@ -74,12 +89,12 @@ source venv/bin/activate
 
 # 3. 启动服务 (数据库已预配置)
 echo -e "${YELLOW}🚀 步骤3: 启动Django服务${NC}"
-python manage.py runserver 0.0.0.0:8000 &
+nohup python manage.py runserver 0.0.0.0:8000 > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > ../logs/backend.pid
 echo -e "${GREEN}✅ 后端服务已启动 (PID: $BACKEND_PID)${NC}"
 
-# 4. 保持后端程序运行，返回上级目录
+# 4. 返回上级目录
 echo -e "${YELLOW}📂 步骤4: 返回上级目录${NC}"
 cd ..
 
@@ -93,7 +108,7 @@ cd frontend
 
 # 6. 启动开发服务器
 echo -e "${YELLOW}🚀 步骤6: 启动前端开发服务器${NC}"
-npm run dev &
+nohup npm run dev > ../logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo $FRONTEND_PID > ../logs/frontend.pid
 echo -e "${GREEN}✅ 前端服务已启动 (PID: $FRONTEND_PID)${NC}"
@@ -102,22 +117,22 @@ echo -e "${GREEN}✅ 前端服务已启动 (PID: $FRONTEND_PID)${NC}"
 echo -e "${YELLOW}⏳ 等待前端服务启动...${NC}"
 sleep 5
 
+cd ..
+
 echo
 echo -e "${GREEN}🎉 ===== 启动完成！ =====${NC}"
 echo -e "${GREEN}🏠 后端地址: http://192.168.110.88:8000${NC}"
 echo -e "${GREEN}🎨 前端地址: http://192.168.110.88:3000${NC}"
 echo -e "${GREEN}📚 API文档: http://192.168.110.88:8000/swagger/${NC}"
 echo -e "${GREEN}⚙️  管理后台: http://192.168.110.88:8000/admin/ (admin/admin123)${NC}"
+echo -e "${GREEN}📊 Grafana监控: http://192.168.110.88:3002${NC}"
 
 echo
 echo -e "${YELLOW}💡 提示：${NC}"
-echo -e "   • 使用 ${RED}Ctrl+C${NC} 停止所有服务"
-echo -e "   • 服务正在后台运行，保持此终端窗口打开"
-echo -e "   • PID已保存到 logs/ 目录"
+echo -e "   • 使用 ${RED}./stop.sh${NC} 停止所有服务"
+echo -e "   • 服务已在后台运行，关闭终端不影响服务"
+echo -e "   • 日志见 logs/ 目录，PID已保存到 logs/ 目录"
 
-# 7. 保持前端程序运行
-echo -e "${BLUE}🔄 保持服务运行中...${NC}"
-echo -e "${BLUE}按 Ctrl+C 停止所有服务${NC}"
-
-# 等待用户中断
-wait
+echo -e "${GREEN}✅ 所有服务已在后台启动，脚本即将退出${NC}"
+# 脚本直接退出，不再阻塞终端
+exit 0

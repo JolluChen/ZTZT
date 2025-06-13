@@ -170,8 +170,7 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     profiles:
-      - monitoring
-  # Grafana for visualization
+      - monitoring  # Grafana for visualization
   grafana:
     image: grafana/grafana:latest
     container_name: ai_platform_grafana
