@@ -18,7 +18,7 @@ echo -e "${BLUE}🚀 启动 AI中台服务${NC}"
 
 # 默认启用 Dify 集成
 ENABLE_DIFY=true
-DAEMON_MODE=false
+DAEMON_MODE=true
 for arg in "$@"; do
     case $arg in
         --no-dify)
@@ -29,16 +29,21 @@ for arg in "$@"; do
             DAEMON_MODE=true
             shift
             ;;
+        --no-daemon)
+            DAEMON_MODE=false
+            shift
+            ;;
         --help|-h)
             echo "用法: $0 [选项]"
             echo "选项:"
             echo "  --no-dify      禁用 Dify AI 平台集成（默认启用）"
-            echo "  --daemon       后台运行模式，启动完成后脚本退出"
+            echo "  --daemon       后台运行模式，启动完成后脚本退出（默认模式）"
+            echo "  --no-daemon    前台运行模式，脚本保持运行并监控服务"
             echo "  --help, -h     显示此帮助信息"
             echo
             echo "注意："
             echo "  启动前请确保已运行 scripts/setup-environment.sh 完成环境配置"
-            echo "  使用 --daemon 模式时，服务将完全在后台运行，可安全关闭终端"
+            echo "  默认使用后台运行模式，服务将在后台运行，可安全关闭终端"
             exit 0
             ;;
     esac
@@ -291,9 +296,9 @@ fi
 
 # 保持脚本运行，等待用户中断
 echo
-echo -e "${YELLOW}🔄 脚本将继续运行以监控服务，按 Ctrl+C 停止所有服务${NC}"
-echo -e "${BLUE}💡 提示：可以关闭此终端，服务将继续在后台运行${NC}"
-echo -e "${BLUE}💡 或者使用 './quick-start.sh --daemon' 启动后台模式${NC}"
+echo -e "${YELLOW}🔄 前台监控模式：脚本将继续运行以监控服务，按 Ctrl+C 停止所有服务${NC}"
+echo -e "${BLUE}💡 提示：关闭此终端会导致脚本停止，但服务将继续在后台运行${NC}"
+echo -e "${BLUE}💡 下次可以直接使用 './quick-start.sh' 启动后台模式（默认）${NC}"
 
 # 等待用户中断或保持运行
 while true; do
