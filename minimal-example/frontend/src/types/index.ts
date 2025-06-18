@@ -103,20 +103,66 @@ export interface Application {
   id: number;
   name: string;
   description: string;
-  model: number;
+  app_type: 'traditional' | 'dify'; // 应用类型
+  model?: number; // 传统应用的模型ID
   status: 'created' | 'deploying' | 'running' | 'stopped' | 'error';
   url: string;
   created_by: number;
   created_at: string;
   updated_at: string;
   config: Record<string, unknown>;
+  dify_config?: DifyApplicationConfig; // Dify 应用配置
 }
 
 export interface ApplicationCreateRequest {
   name: string;
   description: string;
-  model: number;
+  app_type: 'traditional' | 'dify';
+  model?: number; // 传统应用必填
   config?: Record<string, unknown>;
+  dify_config?: DifyApplicationConfig; // Dify 应用必填
+}
+
+// Dify 相关类型
+export interface DifyApplicationConfig {
+  app_type: 'chat' | 'completion' | 'workflow' | 'agent';
+  mode: 'simple' | 'advanced';
+  api_key: string;
+  api_url: string;
+}
+
+export interface DifyApplication {
+  id: number;
+  name: string;
+  description: string;
+  app_type: 'chat' | 'completion' | 'workflow' | 'agent';
+  mode: 'simple' | 'advanced';
+  api_key: string;
+  api_url: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DifyConversation {
+  id: string;
+  dify_app: number;
+  user: number;
+  conversation_id: string;
+  status: 'active' | 'finished' | 'error';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DifyDataset {
+  id: number;
+  dify_app: number;
+  name: string;
+  description?: string;
+  dataset_id: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
 }
 
 // 通用API响应类型

@@ -4,7 +4,8 @@
 from rest_framework import serializers
 from .models import (
     ServiceCategory, Application, ApplicationVersion, 
-    ServiceEndpoint, ServiceMonitoring, ServiceTemplate, ServiceAlert
+    ServiceEndpoint, ServiceMonitoring, ServiceTemplate, ServiceAlert,
+    DifyApplication, DifyConversation, DifyDataset
 )
 
 
@@ -170,3 +171,91 @@ class ServiceEndpointDetailSerializer(ServiceEndpointSerializer):
     
     class Meta(ServiceEndpointSerializer.Meta):
         pass
+
+
+# ====== Dify 集成序列化器 ======
+
+class DifyApplicationSerializer(serializers.ModelSerializer):
+    """Dify 应用序列化器"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    chat_url = serializers.ReadOnlyField()
+    api_endpoint = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = DifyApplication
+        fields = [
+            'id', 'name', 'description', 'icon', 'dify_app_id', 'app_type', 'mode',
+            'model_config', 'prompt_config', 'conversation_config', 'api_key', 'api_url',
+            'is_public', 'is_active', 'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'chat_url', 'api_endpoint'
+        ]
+        read_only_fields = ('created_by', 'created_at', 'updated_at')
+
+
+class DifyApplicationDetailSerializer(DifyApplicationSerializer):
+    """Dify 应用详情序列化器"""
+    conversations_count = serializers.SerializerMethodField()
+    recent_conversations = serializers.SerializerMethodField()
+    
+    class Meta(DifyApplicationSerializer.Meta):
+        fields = DifyApplicationSerializer.Meta.fields + [
+            'conversations_count', 'recent_conversations'
+        ]
+    
+    def get_conversations_count(self, obj):
+        """获取对话数量"""
+        return obj.conversations.count()
+    
+    def get_recent_conversations(self, obj):
+        """获取最近对话"""
+        recent = obj.conversations.all()[:5]
+        return DifyConversationSerializer(recent, many=True).data
+
+
+class DifyConversationSerializer(serializers.ModelSerializer):
+    """Dify 对话序列化器"""
+    application_name = serializers.CharField(source='application.name', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = DifyConversation
+        fields = [
+            'id', 'application', 'application_name', 'user', 'user_name',
+            'conversation_id', 'title', 'summary', 'message_count', 'token_count',
+            'is_pinned', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ('created_at', 'updated_at')
+
+
+class DifyDatasetSerializer(serializers.ModelSerializer):
+    """Dify 知识库序列化器"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    
+    class Meta:
+        model = DifyDataset
+        fields = [
+            'id', 'name', 'description', 'dify_dataset_id', 'index_type', 'embedding_model',
+            'document_count', 'character_count', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ('created_by', 'created_at', 'updated_at')
+
+
+class DifyDatasetDetailSerializer(DifyDatasetSerializer):
+    """Dify 知识库详情序列化器"""
+    applications_count = serializers.SerializerMethodField()
+    related_applications = serializers.SerializerMethodField()
+    
+    class Meta(DifyDatasetSerializer.Meta):
+        fields = DifyDatasetSerializer.Meta.fields + [
+            'applications_count', 'related_applications'
+        ]
+    
+    def get_applications_count(self, obj):
+        """获取关联应用数量"""
+        return obj.difyapplication_set.count()
+    
+    def get_related_applications(self, obj):
+        """获取关联应用"""
+        apps = obj.difyapplication_set.all()[:5]
+        return DifyApplicationSerializer(apps, many=True).data

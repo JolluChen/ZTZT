@@ -4,6 +4,20 @@
 
 一个完整的 AI 中台解决方案，支持 GPU 加速推理、模型管理、监控和可视化界面。
 
+## ⚡ 快速开始
+
+> **🎯 新用户必读**: 本项目采用两步启动流程，首次使用请按顺序执行：
+
+```bash
+# 第一步：环境配置（仅首次使用）
+./scripts/setup-environment.sh
+
+# 第二步：启动服务（日常使用）
+./quick-start.sh
+```
+
+**已配置用户**: 直接运行 `./quick-start.sh` 即可启动所有服务。
+
 ## 🔧 功能特性
 
 ### 核心功能
@@ -14,6 +28,12 @@
 - ✅ **监控系统**：Prometheus + Grafana
 - ✅ **快速部署**：优化的启动脚本，支持后台运行
 - ✅ **实时监控**：自动启动Grafana监控面板
+
+### 🤖 Dify AI 平台集成 (NEW!)
+- ✅ **AI 应用构建**：集成 Dify AI 平台，支持对话、文本生成、工作流、智能体
+- ✅ **统一管理**：在 AI 中台界面中创建和管理 Dify 应用
+- ✅ **API 集成**：完整的 RESTful API 支持 Dify 应用管理
+- ✅ **一键部署**：默认启用 Dify 集成，可使用 `--no-dify` 参数禁用
 
 ### GPU 功能（可选）
 - ✅ **GPU 加速推理**：NVIDIA Triton Inference Server
@@ -50,123 +70,187 @@
 ### 前置要求
 
 - Docker 和 Docker Compose
+- Python 3.8+ 和 Node.js 18+（用于本地开发）
 - 可选：NVIDIA GPU + NVIDIA Container Toolkit（用于 GPU 加速）
-- Python 3.8+（用于工具脚本）
 
-### 快速启动
+### 🎯 两步启动流程
 
-#### 🚀 一键启动 (推荐)
+#### 第一步：环境配置（一次性）
 ```bash
-./start.sh
+# 初次使用或需要重新配置环境时运行
+./scripts/setup-environment.sh
+
+# 选项:
+./scripts/setup-environment.sh --no-dify        # 跳过 Dify 环境配置
+./scripts/setup-environment.sh --force-rebuild # 强制重新构建所有镜像
 ```
-自动检测环境并选择最适合的启动模式。
 
-#### ⚡ 快速启动（环境已配置）
+> **⚠️ 重要**: 这是一次性配置步骤，完成后无需再次运行，除非需要重新配置环境。
+
+#### 第二步：启动服务
 ```bash
-# 快速启动所有服务（适合日常开发）
-# 现已支持自动启动Grafana监控
+# 启动所有服务（默认包含 Dify AI 平台）
 ./quick-start.sh
 
-# 停止服务
-./stop.sh
-```
-
-> **🎉 新特性**: `quick-start.sh` 现在支持后台运行！服务启动后脚本会自动退出，关闭终端不会影响服务运行。
-
-#### 启动模式选择
-
-```bash
-# 自动模式（推荐）
-./start.sh
-
-# 完整模式 - Docker容器化，包含所有服务
-./start.sh --full
-
-# 离线模式 - 使用本地Docker镜像，无需网络
-./start.sh --offline
-
-# 本地模式 - 本地Python环境，无需Docker
-./start.sh --local
+# 仅启动 AI 中台（不包含 Dify）
+./quick-start.sh --no-dify
 
 # 停止所有服务
 ./stop.sh
-
-# 重置环境
-./reset.sh
 ```
 
-#### 环境要求对比
+> **🎉 新架构特性**: 
+> - **环境配置分离**: 环境配置和服务启动完全分离，提高启动速度
+> - **智能检测**: 自动检测环境配置状态，确保服务正常启动
+> - **后台运行**: 服务启动后脚本保持运行以监控服务状态，Ctrl+C 停止所有服务
+> - **Dify 默认集成**: Dify AI 平台默认启用，提供完整的 AI 应用创建功能
 
-| 启动模式 | Docker | 网络 | Python | 功能完整度 | 推荐场景 |
-|---------|--------|------|--------|-----------|----------|
-| 完整模式 | ✅ | ✅ | - | 100% | 生产部署、完整测试 |
-| 离线模式 | ✅ | ❌ | - | 70-90% | 网络受限、演示 |
-| 本地模式 | ❌ | ❌ | ✅ | 60% | 开发调试、快速验证 |
+### 🔄 启动流程说明
+
+```mermaid
+graph TD
+    A[首次使用] --> B[运行 setup-environment.sh]
+    B --> C[配置 Docker 网络]
+    C --> D[构建镜像]
+    D --> E[初始化数据库]
+    E --> F[创建环境标记]
+    F --> G[运行 quick-start.sh]
+    G --> H[检查环境状态]
+    H --> I[启动 Docker 服务]
+    I --> J[启动后端/前端]
+    J --> K[服务运行中]
+    
+    L[后续使用] --> M[运行 quick-start.sh]
+    M --> H
+```
+
+### 💡 使用建议
+
+- **首次部署**: 完整运行两步流程
+- **日常开发**: 只需运行 `./quick-start.sh`
+- **环境重置**: 运行 `./scripts/setup-environment.sh --force-rebuild`
+- **快速验证**: 使用 `./quick-start.sh --no-dify` 减少启动时间
 
 ## 📁 项目结构
 
 ```
 minimal-example/
-├── start.sh                    # 统一启动脚本（支持多种模式）
-├── stop.sh                     # 统一停止脚本
-├── reset.sh                    # 统一重置脚本
-├── docker-compose.yml          # 主要服务配置
-├── backend/                    # Django 后端
-├── frontend/                   # Next.js 前端
-├── monitoring/                 # 监控配置
-├── model-repository/           # 模型仓库
-├── scripts/                    # 核心工具脚本
-│   ├── generate_sample_models.py   # 生成示例模型
-│   ├── manage_triton_models.py     # Triton模型管理
-│   └── diagnose_system.sh          # 系统诊断工具
-├── tests/                      # 测试脚本
-├── utilities/                  # 工具脚本
-├── docs/                       # 文档
-└── archived/                   # 归档文件
+├── quick-start.sh               # 服务启动脚本（主入口）
+├── stop.sh                      # 服务停止脚本
+├── README.md                    # 项目说明文档
+├── backend/                     # Django 后端
+│   ├── apps/                    # Django 应用
+│   │   ├── service_platform/    # 服务中台（含 Dify 集成）
+│   │   ├── data_platform/       # 数据中台
+│   │   └── ai_platform/         # AI 中台
+│   ├── venv/                    # Python 虚拟环境
+│   └── requirements.txt         # Python 依赖
+├── frontend/                    # Next.js 前端
+│   ├── src/                     # 源码目录
+│   ├── node_modules/            # Node.js 依赖
+│   └── package.json             # 前端依赖配置
+├── docker/                      # Docker 配置
+│   ├── docker-compose.yml       # 基础服务配置
+│   ├── dify-docker-compose.yml  # Dify 服务配置
+│   ├── dify-nginx.conf          # Dify Nginx 配置
+│   └── docker-compose.offline.yml # 离线监控配置
+├── scripts/                     # 核心脚本目录
+│   ├── setup-environment.sh     # 环境配置脚本（一次性）
+│   ├── quick-start.sh           # 快速启动脚本（已移至根目录）
+│   └── stop.sh                  # 停止服务脚本（已移至根目录）
+├── configs/                     # 配置文件
+│   ├── dify.env                 # Dify 环境变量
+│   └── ...                     # 其他配置
+├── logs/                        # 服务日志
+├── data/                        # 数据目录
+├── docs/                        # 详细文档
+└── .env-status/                 # 环境状态标记（自动生成）
+    ├── last-setup              # 上次环境配置时间
+    └── dify-configured          # Dify 配置状态标记
 ```
 
-## 🌐 服务访问地址
+### 🔍 关键文件说明
 
-| 服务 | 地址 | 账号/密码 | 说明 |
-|------|------|-----------|------|
-| **前端界面** | http://192.168.110.88:3000 | admin / admin123 | 主要的 Web 界面 |
-| **后端 API** | http://192.168.110.88:8000 | - | Django REST API |
-| **API文档** | http://192.168.110.88:8000/swagger/ | - | Swagger API 文档 |
-| **管理后台** | http://192.168.110.88:8000/admin/ | admin / admin123 | Django 管理后台 |
-| **Grafana监控** | http://192.168.110.88:3002 | admin / admin123 | 监控仪表板 |
-| **Prometheus** | http://192.168.110.88:9090 | - | 监控数据收集 |
-| **PostgreSQL** | localhost:5432 | postgres / postgres | 数据库服务 |
-| **Redis** | localhost:6379 | - | 缓存服务 |
-| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin | 对象存储管理界面 |
-| **MinIO API** | http://localhost:9000 | minioadmin / minioadmin | 对象存储 API |
-| **Prometheus** | http://localhost:9090 | - | 监控数据收集 |
-| **Grafana** | http://localhost:3002 | admin / admin123 | 监控仪表板 |
-| **Triton Server HTTP** | http://localhost:8100 | - | GPU 推理服务 HTTP API* |
-| **Triton Server gRPC** | localhost:8001 | - | GPU 推理服务 gRPC API* |
-| **Triton Metrics** | http://localhost:8002 | - | Triton 监控指标* |
-| **OpenWebUI** | http://localhost:8080 | admin / admin123 | LLM 交互界面* |
-| **Ollama API** | http://localhost:11434 | - | LLM API 服务* |
-| **DCGM Exporter** | http://localhost:9400 | - | GPU 监控指标* |
+- **`quick-start.sh`**: 主要的服务启动脚本，检查环境后启动所有服务
+- **`scripts/setup-environment.sh`**: 一次性环境配置脚本，构建镜像、初始化数据库
+- **`stop.sh`**: 停止所有服务的脚本
+- **`.env-status/`**: 环境配置状态目录，用于检测是否已完成环境配置
 
-*仅在检测到 GPU 或启用相应 profile 时启动
+**注意**: `scripts/` 目录中的 `quick-start.sh` 和 `stop.sh` 已移至项目根目录，请使用根目录下的版本。
+
+## 🌐 服务端口与访问信息
+
+系统启动后，可以通过以下地址访问各个服务：
+
+### 主要服务
+
+| 服务 | 地址 | 账号 | 密码 | 说明 |
+|------|------|------|------|------|
+| AI中台前端 | http://localhost:3000 | admin@example.com | admin123 | Next.js 前端界面 |
+| AI中台后端 API | http://localhost:8000 | - | - | Django REST API |
+| Dify AI平台 | http://localhost:8001 | 需初次设置 | 需初次设置 | Dify AI应用构建平台 |
+
+> **🔧 Dify 初始化说明**: 
+> - 首次访问 Dify 平台时，需要通过 http://localhost:8001/install 完成初始设置
+> - 设置管理员账号和密码后，即可正常使用 Dify 的所有功能
+> - 建议设置账号为: admin@example.com，密码请自定义
+
+### 数据存储服务
+
+| 服务 | 地址 | 账号 | 密码 | 说明 |
+|------|------|------|------|------|
+| PostgreSQL (AI中台) | localhost:5432 | ai_user | ai_password | 主数据库 |
+| PostgreSQL (Dify) | localhost:5433 | dify_user | dify_password | Dify数据库 |
+| Redis (AI中台) | localhost:6379 | - | - | 缓存服务 |
+| Redis (Dify) | localhost:6380 | - | - | Dify缓存 |
+| MinIO 存储服务 | http://localhost:9000 | minioadmin | minioadmin | 对象存储服务 |
+| MinIO 控制台 | http://localhost:9001 | minioadmin | minioadmin | MinIO管理界面 |
+| Weaviate (Dify) | http://localhost:8081 | - | - | 向量数据库 |
+
+### 监控服务
+
+| 服务 | 地址 | 账号 | 密码 | 说明 |
+|------|------|------|------|------|
+| Grafana | http://localhost:3001 | admin | admin | 监控仪表板 |
+| Prometheus | http://localhost:9090 | - | - | 指标收集 |
+
+> **注意**: 首次登录后请务必修改默认密码，特别是在生产环境中。
+
+## 🔐 默认账号安全
+
+出于安全考虑，请在系统部署后尽快修改以下默认账号密码：
+
+1. **Dify 管理员账号**:
+   - 首次访问 Dify 平台 (http://localhost:8001/install)
+   - 设置管理员账号和密码（建议使用 admin@example.com）
+   - 完成初始设置后即可正常使用
+
+2. **MinIO 管理员账号**:
+   - 访问 MinIO 控制台 (http://localhost:9001)
+   - 使用默认账号: minioadmin / minioadmin
+   - 在 Access Keys 设置中修改密码
+
+3. **Grafana 管理员账号**:
+   - 访问 Grafana 界面 (http://localhost:3001)
+   - 使用默认账号: admin / admin
+   - 在首次登录时会提示修改密码
 
 ## 📚 使用指南
 
-### 模型管理
+### 系统启动和停止
 
 ```bash
-# 生成示例模型
-python3 scripts/generate_sample_models.py
+# 环境配置（仅首次使用）
+./scripts/setup-environment.sh
 
-# 管理 Triton 模型
-python3 scripts/manage_triton_models.py
-```
+# 启动所有服务（默认包含 Dify）
+./quick-start.sh
 
-### 系统诊断
+# 启动服务（不包含 Dify）
+./quick-start.sh --no-dify
 
-```bash
-# 系统诊断和问题排查
-bash scripts/diagnose_system.sh
+# 停止所有服务
+./stop.sh
 ```
 
 ### 测试和验证
@@ -212,50 +296,81 @@ docker compose restart <service-name>
 
 ## 🛠️ 开发指南
 
-### 本地开发
+### 本地开发模式
 
 ```bash
-# 完整环境开发（需要Docker）
-./start.sh
+# 首次开发环境配置
+./scripts/setup-environment.sh
 
-# 快速启动（后台运行，推荐）
+# 日常开发启动
 ./quick-start.sh
-# 注意：quick-start.sh 现在支持后台运行
-# 启动完成后脚本会自动退出，服务继续在后台运行
-# 关闭终端不会影响服务
 
-# 本地开发模式（网络受限/仅后端开发）
-./start_local.sh
+# 仅启动 AI 中台（开发时推荐）
+./quick-start.sh --no-dify
 
-# 或手动启动后端
-cd backend
-python manage.py runserver
-
-# 前端开发
-cd frontend
-npm run dev
+# 停止服务
+./stop.sh
 ```
 
-### 环境说明
+### 🔧 环境配置说明
 
-- **完整环境** (`./start.sh`): 包含所有服务（数据库、缓存、对象存储、GPU服务等）
-- **本地开发** (`./start_local.sh`): 仅启动Django后端，使用SQLite数据库
-- **混合开发**: Docker启动基础服务，本地启动开发服务
+#### 环境配置阶段 (`setup-environment.sh`)
+- ✅ 检查和安装依赖（Python venv、Node.js 依赖）
+- ✅ 创建 Docker 网络
+- ✅ 构建必要的 Docker 镜像
+- ✅ 启动并配置基础服务（PostgreSQL、MinIO）
+- ✅ 初始化数据库（AI 中台和 Dify）
+- ✅ 创建环境状态标记
 
-### 脚本说明
+#### 服务启动阶段 (`quick-start.sh`)
+- ✅ 检查环境配置状态
+- ✅ 启动 Docker 服务（PostgreSQL、MinIO、Grafana）
+- ✅ 可选启动 Dify 服务
+- ✅ 启动后端服务（Django）
+- ✅ 启动前端服务（Next.js）
+- ✅ 监控服务状态
 
-- `start.sh`: 主启动脚本，自动检测 GPU 并启动相应服务
-- `quick-start.sh`: 快速启动脚本，**现已支持后台运行**，自动启动 Grafana 监控
-- `stop.sh`: 停止脚本，清理容器和网络
-- `scripts/`: 包含各种工具脚本
-- `tests/`: 包含测试和验证脚本
+### 📋 开发工作流
 
-#### quick-start.sh 新特性
-- ✅ **后台运行**: 服务启动后脚本自动退出
-- ✅ **监控集成**: 自动启动 Grafana 监控服务  
-- ✅ **端口检查**: 自动检测并清理端口冲突
-- ✅ **日志记录**: 后端和前端日志保存到 logs/ 目录
-- ✅ **PID 管理**: 进程 ID 保存，便于管理
+1. **初次设置**:
+   ```bash
+   git clone <repository>
+   cd minimal-example
+   ./scripts/setup-environment.sh  # 一次性配置
+   ```
+
+2. **日常开发**:
+   ```bash
+   ./quick-start.sh                # 启动服务
+   # 进行开发工作...
+   ./stop.sh                       # 停止服务
+   ```
+
+3. **环境重置**（如有需要）:
+   ```bash
+   ./scripts/setup-environment.sh --force-rebuild
+   ```
+
+### 🔍 脚本功能对比
+
+| 脚本 | 功能 | 执行频率 | 执行时间 |
+|------|------|----------|----------|
+| `setup-environment.sh` | 环境配置、镜像构建、数据库初始化 | 一次性 | **30-90分钟**（首次）|
+| `quick-start.sh` | 服务启动、状态监控 | 日常使用 | 1-2分钟 |
+| `stop.sh` | 服务停止、资源清理 | 需要时 | 30秒 |
+
+> **⏱️ 构建时间说明**: 
+> - **AI 中台构建**: 5-15分钟
+> - **Dify 镜像构建**: 30-60分钟（需下载1788个npm包）
+> - **网络因素**: 国外服务器访问可能较慢，建议使用国内镜像源
+
+### 💻 本地开发注意事项
+
+- **端口占用**: 确保 3000、8000、5432、9000、9001、3001、8001、5001、6380、8081 端口未被占用
+- **Docker 资源**: 确保 Docker 有足够的内存分配（推荐 4GB+）
+- **网络配置**: 脚本会自动创建 `ai_platform_network` Docker 网络
+- **日志查看**: 服务日志保存在 `logs/` 目录中
+- **进程管理**: 进程 PID 保存在 `logs/` 目录中，便于手动管理
 
 ## 📖 文档
 
@@ -269,17 +384,156 @@ npm run dev
 
 如果遇到问题，请按以下顺序排查：
 
-1. **基础检查**
-   - 检查 Docker 服务是否正常运行
-   - 确认端口没有被占用（3000, 8000, 3002）
-   - 查看容器日志排查具体错误
-   
-2. **监控服务问题**
-   - Grafana 无法访问：检查 http://192.168.110.88:3002
-   - 检查 Grafana 容器状态：`docker ps | grep grafana`
-   - 查看 Grafana 日志：`docker logs ai-platform-grafana`
+### 1. 环境配置问题
 
-3. **服务状态检查**
-   ```bash
-   # 检查所有容器状态
-   docker ps
+如果 `quick-start.sh` 报告环境未配置：
+
+```bash
+# 运行环境配置脚本
+./scripts/setup-environment.sh
+
+# 如果仍有问题，强制重新构建
+./scripts/setup-environment.sh --force-rebuild
+```
+
+### 2. 服务启动问题
+
+```bash
+# 检查 Docker 服务状态
+docker ps
+
+# 查看特定服务日志
+docker compose -f docker/docker-compose.yml logs postgres
+docker compose -f docker/dify-docker-compose.yml logs dify-api
+
+# 检查端口占用
+netstat -tlnp | grep -E "(3000|8000|5432|9000)"
+
+# 手动清理端口（如果需要）
+./stop.sh
+```
+
+### 3. 网络和连接问题
+
+```bash
+# 检查 Docker 网络
+docker network ls | grep ai_platform_network
+
+# 重新创建网络（如果需要）
+docker network rm ai_platform_network
+docker network create ai_platform_network
+```
+
+### 4. 数据库问题
+
+```bash
+# 检查 PostgreSQL 连接
+docker exec -it ai_platform_postgres pg_isready -U ai_user
+
+# 查看数据库日志
+docker compose -f docker/docker-compose.yml logs postgres
+
+# 重新初始化数据库（如果需要）
+cd backend && python manage.py migrate
+```
+
+### 5. 前端/后端问题
+
+```bash
+# 查看服务日志
+tail -f logs/backend.log
+tail -f logs/frontend.log
+
+# 检查进程状态
+ps aux | grep -E "(python|node)" | grep -E "(8000|3000)"
+
+# 手动重启服务
+./stop.sh
+./quick-start.sh
+```
+
+### 6. 常见错误解决
+
+| 错误类型 | 解决方案 |
+|---------|----------|
+| 端口被占用 | 运行 `./stop.sh` 或手动终止占用进程 |
+| Docker 网络错误 | 重新创建网络 `docker network create ai_platform_network` |
+| 环境未配置 | 运行 `./scripts/setup-environment.sh` |
+| 镜像不存在 | 运行 `./scripts/setup-environment.sh --force-rebuild` |
+| 数据库连接失败 | 检查 PostgreSQL 容器状态和日志 |
+| Dify 服务异常 | 确保已运行环境配置脚本且 Dify 镜像存在 |
+
+### 7. 获取帮助
+
+```bash
+# 查看脚本帮助
+./scripts/setup-environment.sh --help
+./quick-start.sh --help
+
+# 查看环境状态
+ls -la .env-status/
+```
+
+### ⚠️ **网络问题解决方案**
+
+**项目完全离线运行**，所有 Docker 镜像都存储在本地 `ZTZT/packages/docker-images/` 目录中：
+
+#### 本地镜像资源
+项目包含以下预打包的 Docker 镜像：
+- **基础服务**: PostgreSQL 16, Redis 7.2, MinIO 2024.6.4
+- **监控服务**: Grafana, Prometheus, Node Exporter
+- **AI 服务**: Weaviate 1.22.4/1.24.4
+- **系统镜像**: Node.js 22-alpine, Python 3.12-slim
+
+#### 自动镜像加载
+脚本会自动检测并加载本地镜像：
+```bash
+# 脚本会自动从以下位置加载镜像
+/home/lsyzt/ZTZT/packages/docker-images/
+├── postgres-16.tar
+├── redis-7.tar
+├── minio-2024.6.4-debian-12-r0.tar
+├── weaviate.tar
+├── grafana.tar
+├── prometheus.tar
+└── ...其他镜像文件
+```
+
+#### 解决方案（按优先级）
+
+**方案1：正常运行（推荐）**
+```bash
+# 项目已完全离线化，直接运行即可
+./scripts/setup-environment.sh
+```
+
+**方案2：跳过 Dify 构建（快速验证）**
+```bash
+# 仅构建 AI 中台核心功能
+./scripts/setup-environment.sh --no-dify
+
+# 后续可以选择性启动
+./quick-start.sh --no-dify
+```
+
+**方案3：强制重新加载镜像**
+```bash
+# 如果镜像加载有问题，强制重新构建
+./scripts/setup-environment.sh --force-rebuild
+```
+
+#### 故障排查
+如果仍遇到网络相关错误：
+
+```bash
+# 检查本地镜像包是否完整
+ls -la /home/lsyzt/ZTZT/packages/docker-images/
+
+# 手动加载特定镜像（示例）
+docker load -i /home/lsyzt/ZTZT/packages/docker-images/weaviate.tar
+
+# 检查已加载的镜像
+docker images | grep -E "(postgres|redis|minio|weaviate)"
+```
+
+> **💡 设计理念**: 项目采用完全离线设计，避免网络依赖问题。所有必要的 Docker 镜像都预先打包在 `packages/` 目录中，确保在任何网络环境下都能稳定运行。

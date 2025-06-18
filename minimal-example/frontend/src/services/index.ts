@@ -302,4 +302,82 @@ export const serviceService = {
     const response = await api.get(API_ENDPOINTS.MODEL.MODELS, { params });
     return response.data;
   },
+
+  // Dify 应用管理
+  async getDifyApplications(params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await api.get(API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS, { params });
+    return response.data;
+  },
+
+  async createDifyApplication(applicationData: {
+    name: string;
+    description: string;
+    app_type: string;
+    mode: string;
+    api_key: string;
+    api_url: string;
+  }): Promise<any> {
+    const response = await api.post(API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS, applicationData);
+    return response.data;
+  },
+
+  async updateDifyApplication(id: number, applicationData: any): Promise<any> {
+    const response = await api.patch(`${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${id}/`, applicationData);
+    return response.data;
+  },
+
+  async deleteDifyApplication(id: number): Promise<void> {
+    await api.delete(`${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${id}/`);
+  },
+
+  // Dify 对话管理
+  async getDifyConversations(appId: number, params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<ApiResponse<any>> {
+    const response = await api.get(`${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${appId}/conversations/`, { params });
+    return response.data;
+  },
+
+  async createDifyConversation(appId: number, data: {
+    user_id: number;
+    inputs?: Record<string, any>;
+  }): Promise<any> {
+    const response = await api.post(`${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${appId}/conversations/`, data);
+    return response.data;
+  },
+
+  // Dify 聊天
+  async sendDifyMessage(appId: number, conversationId: string, data: {
+    query: string;
+    inputs?: Record<string, any>;
+    response_mode?: string;
+  }): Promise<any> {
+    const response = await api.post(
+      `${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${appId}/conversations/${conversationId}/messages/`, 
+      data
+    );
+    return response.data;
+  },
+
+  // Dify 知识库管理
+  async getDifyDatasets(appId: number, params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<ApiResponse<any>> {
+    const response = await api.get(`${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${appId}/datasets/`, { params });
+    return response.data;
+  },
+
+  async createDifyDataset(appId: number, data: {
+    name: string;
+    description?: string;
+  }): Promise<any> {
+    const response = await api.post(`${API_ENDPOINTS.SERVICE.DIFY.APPLICATIONS}${appId}/datasets/`, data);
+    return response.data;
+  },
 };

@@ -39,6 +39,13 @@ export const API_ENDPOINTS = {
     DEPLOY: '/service/deploy/',
     STATUS: '/service/status/',
     LOGS: '/service/logs/',
+    // Dify 集成 API
+    DIFY: {
+      APPLICATIONS: '/service/dify/applications/',
+      CONVERSATIONS: '/service/dify/conversations/',
+      DATASETS: '/service/dify/datasets/',
+      CHAT: '/service/dify/chat/',
+    },
   },
 };
 

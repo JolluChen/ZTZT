@@ -1,0 +1,133 @@
+version: '3.8'
+
+x-shared-env: &shared-api-worker-env
+  # Dify Core API Configuration
+  CONSOLE_API_URL: ${DIFY_CONSOLE_API_URL:-http://localhost:8001}
+  CONSOLE_WEB_URL: ${DIFY_CONSOLE_WEB_URL:-http://localhost:8001}
+  SERVICE_API_URL: ${DIFY_SERVICE_API_URL:-http://localhost:8001}
+  APP_API_URL: ${DIFY_APP_API_URL:-http://localhost:8001}
+  APP_WEB_URL: ${DIFY_APP_WEB_URL:-http://localhost:8001}
+  FILES_URL: ${DIFY_FILES_URL:-http://localhost:8001}
+  
+  # Debug and Logging
+  LOG_LEVEL: ${DIFY_LOG_LEVEL:-INFO}
+  DEBUG: ${DIFY_DEBUG:-false}
+  FLASK_DEBUG: ${DIFY_FLASK_DEBUG:-false}
+  ENABLE_REQUEST_LOGGING: ${DIFY_ENABLE_REQUEST_LOGGING:-false}
+  
+  # Security
+  SECRET_KEY: ${DIFY_SECRET_KEY:-sk-ai-platform-dify-integration-2024}
+  INIT_PASSWORD: ${DIFY_INIT_PASSWORD:-}
+  DEPLOY_ENV: ${DIFY_DEPLOY_ENV:-DEVELOPMENT}
+  
+  # Database Configuration (使用 AI 中台的 PostgreSQL)
+  DB_USERNAME: ${POSTGRES_USER:-ai_user}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-ai_password}
+  DB_HOST: ${POSTGRES_HOST:-postgres}
+  DB_PORT: ${POSTGRES_PORT:-5432}
+  DB_DATABASE: ${DIFY_DB_NAME:-dify}
+  SQLALCHEMY_POOL_SIZE: ${DIFY_SQLALCHEMY_POOL_SIZE:-30}
+  SQLALCHEMY_POOL_RECYCLE: ${DIFY_SQLALCHEMY_POOL_RECYCLE:-3600}
+  SQLALCHEMY_ECHO: ${DIFY_SQLALCHEMY_ECHO:-false}
+  
+  # Redis Configuration (使用本地 Redis)
+  REDIS_HOST: ${REDIS_HOST:-localhost}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_USE_SSL: ${REDIS_USE_SSL:-false}
+  REDIS_DB: ${DIFY_REDIS_DB:-2}
+  CELERY_BROKER_URL: ${DIFY_CELERY_BROKER_URL:-redis://localhost:6379/3}
+  
+  # Storage Configuration (使用本地存储)
+  STORAGE_TYPE: ${DIFY_STORAGE_TYPE:-local}
+  STORAGE_LOCAL_PATH: ${DIFY_STORAGE_LOCAL_PATH:-/app/storage}
+  
+  # API Configuration
+  WEB_API_CORS_ALLOW_ORIGINS: ${DIFY_WEB_API_CORS_ALLOW_ORIGINS:-*}
+  CONSOLE_CORS_ALLOW_ORIGINS: ${DIFY_CONSOLE_CORS_ALLOW_ORIGINS:-*}
+  
+  # LLM Configuration
+  OPENAI_API_BASE: ${DIFY_OPENAI_API_BASE:-https://api.openai.com/v1}
+  
+  # Performance
+  APP_MAX_ACTIVE_REQUESTS: ${DIFY_APP_MAX_ACTIVE_REQUESTS:-0}
+  APP_MAX_EXECUTION_TIME: ${DIFY_APP_MAX_EXECUTION_TIME:-1200}
+  SERVER_WORKER_AMOUNT: ${DIFY_SERVER_WORKER_AMOUNT:-1}
+  SERVER_WORKER_CLASS: ${DIFY_SERVER_WORKER_CLASS:-gevent}
+  GUNICORN_TIMEOUT: ${DIFY_GUNICORN_TIMEOUT:-360}
+
+services:
+  # Dify API Server
+  dify-api:
+    image: ai-platform-dify-api:latest
+    container_name: ai_platform_dify_api
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      <<: *shared-api-worker-env
+      MODE: api
+    volumes:
+      - dify_app_storage:/app/storage
+    networks:
+      - ai_platform_network
+    command: >
+      bash -c "
+      python -m flask db upgrade &&
+      python app.py
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - dify
+
+  # Dify Worker (Background Tasks)
+  dify-worker:
+    image: ai-platform-dify-api:latest
+    container_name: ai_platform_dify_worker
+    restart: unless-stopped
+    environment:
+      <<: *shared-api-worker-env
+      MODE: worker
+    volumes:
+      - dify_app_storage:/app/storage
+    networks:
+      - ai_platform_network
+    command: celery -A app.celery worker -P gevent -c 1 --loglevel INFO -Q dataset,generation,mail,ops_trace,app_deletion
+    healthcheck:
+      test: ["CMD", "bash", "-c", "celery -A app.celery inspect ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - dify
+
+  # Dify Web Console (直接暴露端口，不使用 nginx 代理)
+  dify-web-direct:
+    image: ai-platform-dify-web:latest
+    container_name: ai_platform_dify_web_direct
+    restart: unless-stopped
+    ports:
+      - "8001:3000"
+    environment:
+      EDITION: SELF_HOSTED
+      CONSOLE_API_URL: http://192.168.110.88:5001
+      APP_API_URL: http://192.168.110.88:5001
+      SENTRY_DSN: ${DIFY_SENTRY_DSN:-}
+    depends_on:
+      - dify-api
+    networks:
+      - ai_platform_network
+    profiles:
+      - dify
+
+volumes:
+  dify_app_storage:
+    driver: local
+
+networks:
+  ai_platform_network:
+    external: true

@@ -473,67 +473,141 @@ export default function ApplicationsPage() {
           </Form.Item>
 
           <Form.Item
-            label="选择模型"
-            name="model"
-            rules={[{ required: true, message: '请选择模型' }]}
+            label="应用类型"
+            name="app_type"
+            rules={[{ required: true, message: '请选择应用类型' }]}
+            initialValue="traditional"
           >
-            <Select
-              placeholder="请选择模型"
-              showSearch
-              filterOption={(input, option) =>
-                ((option?.label as string) || '').toLowerCase().includes(input.toLowerCase())
-              }
-            >
-              {modelsData?.results?.filter((model: any) => model.status === 'ready' || model.status === 'deployed')
-                .map((model: any) => (
-                <Option key={model.id} value={model.id}>
-                  {model.name} (v{model.version})
-                </Option>
-              ))}
+            <Select placeholder="请选择应用类型">
+              <Option value="traditional">传统应用</Option>
+              <Option value="dify">Dify AI 应用</Option>
             </Select>
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="CPU限制"
-                name={['config', 'cpu']}
-                initialValue="500m"
-              >
-                <Select>
-                  <Option value="100m">100m</Option>
-                  <Option value="250m">250m</Option>
-                  <Option value="500m">500m</Option>
-                  <Option value="1000m">1000m</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="内存限制"
-                name={['config', 'memory']}
-                initialValue="512Mi"
-              >
-                <Select>
-                  <Option value="256Mi">256Mi</Option>
-                  <Option value="512Mi">512Mi</Option>
-                  <Option value="1Gi">1Gi</Option>
-                  <Option value="2Gi">2Gi</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
           <Form.Item
-            label="副本数量"
-            name={['config', 'replicas']}
-            initialValue={1}
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => 
+              prevValues.app_type !== currentValues.app_type
+            }
           >
-            <Select>
-              <Option value={1}>1个副本</Option>
-              <Option value={2}>2个副本</Option>
-              <Option value={3}>3个副本</Option>
-            </Select>
+            {({ getFieldValue }) => {
+              const appType = getFieldValue('app_type');
+              
+              if (appType === 'dify') {
+                return (
+                  <>
+                    <Form.Item
+                      label="Dify 应用类型"
+                      name={['dify_config', 'app_type']}
+                      rules={[{ required: true, message: '请选择 Dify 应用类型' }]}
+                    >
+                      <Select placeholder="请选择 Dify 应用类型">
+                        <Option value="chat">对话应用</Option>
+                        <Option value="completion">文本生成</Option>
+                        <Option value="workflow">工作流</Option>
+                        <Option value="agent">智能体</Option>
+                      </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                      label="模式"
+                      name={['dify_config', 'mode']}
+                      initialValue="simple"
+                    >
+                      <Select>
+                        <Option value="simple">简单模式</Option>
+                        <Option value="advanced">高级模式</Option>
+                      </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                      label="Dify API 密钥"
+                      name={['dify_config', 'api_key']}
+                      rules={[{ required: true, message: '请输入 Dify API 密钥' }]}
+                    >
+                      <Input.Password placeholder="请输入 Dify API 密钥" />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="Dify API 地址"
+                      name={['dify_config', 'api_url']}
+                      initialValue="http://localhost:8001"
+                    >
+                      <Input placeholder="Dify API 地址" />
+                    </Form.Item>
+                  </>
+                );
+              }
+
+              // 传统应用配置
+              return (
+                <>
+                  <Form.Item
+                    label="选择模型"
+                    name="model"
+                    rules={[{ required: true, message: '请选择模型' }]}
+                  >
+                    <Select
+                      placeholder="请选择模型"
+                      showSearch
+                      filterOption={(input, option) =>
+                        ((option?.label as string) || '').toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
+                      {modelsData?.results?.filter((model: any) => model.status === 'ready' || model.status === 'deployed')
+                        .map((model: any) => (
+                        <Option key={model.id} value={model.id}>
+                          {model.name} (v{model.version})
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item
+                        label="CPU限制"
+                        name={['config', 'cpu']}
+                        initialValue="500m"
+                      >
+                        <Select>
+                          <Option value="100m">100m</Option>
+                          <Option value="250m">250m</Option>
+                          <Option value="500m">500m</Option>
+                          <Option value="1000m">1000m</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        label="内存限制"
+                        name={['config', 'memory']}
+                        initialValue="512Mi"
+                      >
+                        <Select>
+                          <Option value="256Mi">256Mi</Option>
+                          <Option value="512Mi">512Mi</Option>
+                          <Option value="1Gi">1Gi</Option>
+                          <Option value="2Gi">2Gi</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Form.Item
+                    label="副本数量"
+                    name={['config', 'replicas']}
+                    initialValue={1}
+                  >
+                    <Select>
+                      <Option value={1}>1个副本</Option>
+                      <Option value={2}>2个副本</Option>
+                      <Option value={3}>3个副本</Option>
+                    </Select>
+                  </Form.Item>
+                </>
+              );
+            }}
           </Form.Item>
         </Form>
       </Modal>

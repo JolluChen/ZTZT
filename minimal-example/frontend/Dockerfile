@@ -4,10 +4,15 @@ FROM node:22-alpine AS base
 # 安装依赖阶段
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
+# 使用中国镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 WORKDIR /app
 
 # 复制依赖文件
 COPY package.json package-lock.json* ./
+# 使用中国 npm 镜像源
+RUN npm config set registry https://registry.npmmirror.com/
 RUN npm ci --only=production
 
 # 构建阶段
