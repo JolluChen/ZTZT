@@ -94,4 +94,4 @@ volumes:
 
 networks:
   ai_platform_network:
-    driver: bridge
+    external: true

@@ -18,20 +18,27 @@ echo -e "${BLUE}🚀 启动 AI中台服务${NC}"
 
 # 默认启用 Dify 集成
 ENABLE_DIFY=true
+DAEMON_MODE=false
 for arg in "$@"; do
     case $arg in
         --no-dify)
             ENABLE_DIFY=false
             shift
             ;;
+        --daemon)
+            DAEMON_MODE=true
+            shift
+            ;;
         --help|-h)
             echo "用法: $0 [选项]"
             echo "选项:"
             echo "  --no-dify      禁用 Dify AI 平台集成（默认启用）"
+            echo "  --daemon       后台运行模式，启动完成后脚本退出"
             echo "  --help, -h     显示此帮助信息"
             echo
             echo "注意："
             echo "  启动前请确保已运行 scripts/setup-environment.sh 完成环境配置"
+            echo "  使用 --daemon 模式时，服务将完全在后台运行，可安全关闭终端"
             exit 0
             ;;
     esac
@@ -39,7 +46,12 @@ done
 
 # 获取脚本目录并设置项目根目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
+# 如果脚本在 scripts 目录中，项目根目录是上一级；如果在根目录中，项目根目录就是当前目录
+if [[ "$SCRIPT_DIR" == */scripts ]]; then
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+    PROJECT_ROOT="$SCRIPT_DIR"
+fi
 cd "$PROJECT_ROOT"
 
 # 检查环境配置状态
@@ -203,8 +215,10 @@ echo -e "${BLUE}激活虚拟环境...${NC}"
 source venv/bin/activate
 
 echo -e "${BLUE}启动 Django 服务...${NC}"
+# 使用 nohup 和 disown 确保进程完全脱离终端会话
 nohup python manage.py runserver 0.0.0.0:8000 > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
+disown $BACKEND_PID
 echo $BACKEND_PID > ../logs/backend.pid
 echo -e "${GREEN}✅ 后端服务已启动 (PID: $BACKEND_PID)${NC}"
 
@@ -215,8 +229,10 @@ echo -e "${YELLOW}🎨 步骤3: 启动前端服务${NC}"
 cd frontend
 
 echo -e "${BLUE}启动 Next.js 开发服务器...${NC}"
+# 使用 nohup 和 disown 确保进程完全脱离终端会话
 nohup npm run dev > ../logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
+disown $FRONTEND_PID
 echo $FRONTEND_PID > ../logs/frontend.pid
 echo -e "${GREEN}✅ 前端服务已启动 (PID: $FRONTEND_PID)${NC}"
 
@@ -261,10 +277,23 @@ fi
 
 echo -e "${GREEN}✅ 所有服务已成功启动并运行${NC}"
 
+# 如果是 daemon 模式，脚本退出，服务继续在后台运行
+if [ "$DAEMON_MODE" = true ]; then
+    echo
+    echo -e "${GREEN}🔄 后台运行模式：脚本退出，服务继续运行${NC}"
+    echo -e "${YELLOW}💡 管理提示：${NC}"
+    echo -e "   • 查看服务状态: ps aux | grep -E '(python|node).*:(8000|3000)'"
+    echo -e "   • 查看服务日志: tail -f logs/{backend,frontend}.log"
+    echo -e "   • 停止所有服务: ./stop.sh"
+    echo -e "   • 重新启动服务: ./quick-start.sh"
+    exit 0
+fi
+
 # 保持脚本运行，等待用户中断
 echo
 echo -e "${YELLOW}🔄 脚本将继续运行以监控服务，按 Ctrl+C 停止所有服务${NC}"
-echo -e "${BLUE}💡 或者可以关闭此终端，服务将继续在后台运行${NC}"
+echo -e "${BLUE}💡 提示：可以关闭此终端，服务将继续在后台运行${NC}"
+echo -e "${BLUE}💡 或者使用 './quick-start.sh --daemon' 启动后台模式${NC}"
 
 # 等待用户中断或保持运行
 while true; do

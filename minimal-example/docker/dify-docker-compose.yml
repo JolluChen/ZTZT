@@ -20,23 +20,23 @@ x-shared-env: &shared-api-worker-env
   INIT_PASSWORD: ${DIFY_INIT_PASSWORD:-}
   DEPLOY_ENV: ${DIFY_DEPLOY_ENV:-DEVELOPMENT}
   
-  # Database Configuration (使用 AI 中台的 PostgreSQL)
-  DB_USERNAME: ${POSTGRES_USER:-ai_user}
-  DB_PASSWORD: ${POSTGRES_PASSWORD:-ai_password}
-  DB_HOST: ${POSTGRES_HOST:-postgres}
-  DB_PORT: ${POSTGRES_PORT:-5432}
+  # Database Configuration (使用共享的 PostgreSQL)
+  DB_USERNAME: ${DIFY_POSTGRES_USER:-ai_user}
+  DB_PASSWORD: ${DIFY_POSTGRES_PASSWORD:-ai_password}
+  DB_HOST: ${DIFY_POSTGRES_HOST:-ai_platform_postgres}
+  DB_PORT: ${DIFY_POSTGRES_PORT:-5432}
   DB_DATABASE: ${DIFY_DB_NAME:-dify}
   SQLALCHEMY_POOL_SIZE: ${DIFY_SQLALCHEMY_POOL_SIZE:-30}
   SQLALCHEMY_POOL_RECYCLE: ${DIFY_SQLALCHEMY_POOL_RECYCLE:-3600}
   SQLALCHEMY_ECHO: ${DIFY_SQLALCHEMY_ECHO:-false}
   
-  # Redis Configuration (使用本地 Redis)
-  REDIS_HOST: ${REDIS_HOST:-localhost}
-  REDIS_PORT: ${REDIS_PORT:-6379}
-  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  # Redis Configuration (使用 Dify 的 Redis)
+  REDIS_HOST: ${DIFY_REDIS_HOST:-dify_redis}
+  REDIS_PORT: ${DIFY_REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${DIFY_REDIS_PASSWORD:-}
   REDIS_USE_SSL: ${REDIS_USE_SSL:-false}
   REDIS_DB: ${DIFY_REDIS_DB:-2}
-  CELERY_BROKER_URL: ${DIFY_CELERY_BROKER_URL:-redis://localhost:6379/3}
+  CELERY_BROKER_URL: ${DIFY_CELERY_BROKER_URL:-redis://dify_redis:6379/3}
   
   # Storage Configuration (使用本地存储)
   STORAGE_TYPE: ${DIFY_STORAGE_TYPE:-local}
