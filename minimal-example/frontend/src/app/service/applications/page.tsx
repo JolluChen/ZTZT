@@ -37,7 +37,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import ApplicationMonitor from '@/components/service/ApplicationMonitor';
 import { serviceService } from '@/services';
-import { Application, ApplicationCreateRequest } from '@/types';
+import { Application } from '@/types';
 import { STATUS_LABELS, TABLE_CONFIG } from '@/constants';
 import { formatDate } from '@/utils';
 
@@ -45,11 +45,9 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function ApplicationsPage() {
-  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [configModalVisible, setConfigModalVisible] = useState(false);
   const [monitorModalVisible, setMonitorModalVisible] = useState(false);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [form] = Form.useForm();
   const [configForm] = Form.useForm();
   const queryClient = useQueryClient();
 
@@ -64,24 +62,10 @@ export default function ApplicationsPage() {
     queryFn: () => serviceService.getApplications(),
   });
 
-  // 获取模型列表（用于创建应用时选择）
+  // 获取模型列表（用于显示模型信息）
   const { data: modelsData } = useQuery({
     queryKey: ['models'],
     queryFn: () => serviceService.getModels(),
-  });
-
-  // 创建应用
-  const createAppMutation = useMutation({
-    mutationFn: (data: ApplicationCreateRequest) => serviceService.createApplication(data),
-    onSuccess: () => {
-      message.success('应用创建成功');
-      setCreateModalVisible(false);
-      form.resetFields();
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-    },
-    onError: (error: any) => {
-      message.error(error?.response?.data?.message || '创建失败');
-    },
   });
 
   // 启动应用
@@ -134,10 +118,6 @@ export default function ApplicationsPage() {
       message.error(error?.response?.data?.message || '更新失败');
     },
   });
-
-  const handleCreateApp = async (values: ApplicationCreateRequest) => {
-    createAppMutation.mutate(values);
-  };
 
   const handleUpdateConfig = async (values: any) => {
     if (selectedApp) {
@@ -351,10 +331,11 @@ export default function ApplicationsPage() {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <MainLayout>
+      <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <Title level={2}>应用管理</Title>
-        <Text type="secondary">管理和监控AI应用服务</Text>
+        <Text type="secondary">管理和监控AI应用服务，点击"创建应用"或"管理面板"将跳转到应用管理平台</Text>
       </div>
 
       {/* 统计卡片 */}
@@ -416,7 +397,7 @@ export default function ApplicationsPage() {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => setCreateModalVisible(true)}
+              onClick={() => window.open('http://192.168.110.88:8001', '_blank')}
             >
               创建应用
             </Button>
@@ -426,6 +407,13 @@ export default function ApplicationsPage() {
               loading={isLoading}
             >
               刷新
+            </Button>
+            <Button
+              type="default"
+              icon={<LinkOutlined />}
+              onClick={() => window.open('http://192.168.110.88:8001', '_blank')}
+            >
+              管理面板
             </Button>
           </Space>
         </div>
@@ -438,179 +426,6 @@ export default function ApplicationsPage() {
           {...TABLE_CONFIG}
         />
       </Card>
-
-      {/* 创建应用对话框 */}
-      <Modal
-        title="创建应用"
-        open={createModalVisible}
-        onCancel={() => setCreateModalVisible(false)}
-        onOk={() => form.submit()}
-        confirmLoading={createAppMutation.isPending}
-        width={600}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreateApp}
-        >
-          <Form.Item
-            label="应用名称"
-            name="name"
-            rules={[{ required: true, message: '请输入应用名称' }]}
-          >
-            <Input placeholder="请输入应用名称" />
-          </Form.Item>
-
-          <Form.Item
-            label="描述"
-            name="description"
-            rules={[{ required: true, message: '请输入应用描述' }]}
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder="请输入应用描述"
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="应用类型"
-            name="app_type"
-            rules={[{ required: true, message: '请选择应用类型' }]}
-            initialValue="traditional"
-          >
-            <Select placeholder="请选择应用类型">
-              <Option value="traditional">传统应用</Option>
-              <Option value="dify">Dify AI 应用</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            noStyle
-            shouldUpdate={(prevValues, currentValues) => 
-              prevValues.app_type !== currentValues.app_type
-            }
-          >
-            {({ getFieldValue }) => {
-              const appType = getFieldValue('app_type');
-              
-              if (appType === 'dify') {
-                return (
-                  <>
-                    <Form.Item
-                      label="Dify 应用类型"
-                      name={['dify_config', 'app_type']}
-                      rules={[{ required: true, message: '请选择 Dify 应用类型' }]}
-                    >
-                      <Select placeholder="请选择 Dify 应用类型">
-                        <Option value="chat">对话应用</Option>
-                        <Option value="completion">文本生成</Option>
-                        <Option value="workflow">工作流</Option>
-                        <Option value="agent">智能体</Option>
-                      </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                      label="模式"
-                      name={['dify_config', 'mode']}
-                      initialValue="simple"
-                    >
-                      <Select>
-                        <Option value="simple">简单模式</Option>
-                        <Option value="advanced">高级模式</Option>
-                      </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                      label="Dify API 密钥"
-                      name={['dify_config', 'api_key']}
-                      rules={[{ required: true, message: '请输入 Dify API 密钥' }]}
-                    >
-                      <Input.Password placeholder="请输入 Dify API 密钥" />
-                    </Form.Item>
-
-                    <Form.Item
-                      label="Dify API 地址"
-                      name={['dify_config', 'api_url']}
-                      initialValue="http://localhost:8001"
-                    >
-                      <Input placeholder="Dify API 地址" />
-                    </Form.Item>
-                  </>
-                );
-              }
-
-              // 传统应用配置
-              return (
-                <>
-                  <Form.Item
-                    label="选择模型"
-                    name="model"
-                    rules={[{ required: true, message: '请选择模型' }]}
-                  >
-                    <Select
-                      placeholder="请选择模型"
-                      showSearch
-                      filterOption={(input, option) =>
-                        ((option?.label as string) || '').toLowerCase().includes(input.toLowerCase())
-                      }
-                    >
-                      {modelsData?.results?.filter((model: any) => model.status === 'ready' || model.status === 'deployed')
-                        .map((model: any) => (
-                        <Option key={model.id} value={model.id}>
-                          {model.name} (v{model.version})
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item
-                        label="CPU限制"
-                        name={['config', 'cpu']}
-                        initialValue="500m"
-                      >
-                        <Select>
-                          <Option value="100m">100m</Option>
-                          <Option value="250m">250m</Option>
-                          <Option value="500m">500m</Option>
-                          <Option value="1000m">1000m</Option>
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        label="内存限制"
-                        name={['config', 'memory']}
-                        initialValue="512Mi"
-                      >
-                        <Select>
-                          <Option value="256Mi">256Mi</Option>
-                          <Option value="512Mi">512Mi</Option>
-                          <Option value="1Gi">1Gi</Option>
-                          <Option value="2Gi">2Gi</Option>
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                  </Row>
-
-                  <Form.Item
-                    label="副本数量"
-                    name={['config', 'replicas']}
-                    initialValue={1}
-                  >
-                    <Select>
-                      <Option value={1}>1个副本</Option>
-                      <Option value={2}>2个副本</Option>
-                      <Option value={3}>3个副本</Option>
-                    </Select>
-                  </Form.Item>
-                </>
-              );
-            }}
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* 配置更新对话框 */}
       <Modal
@@ -696,5 +511,6 @@ export default function ApplicationsPage() {
         )}
       </Modal>
     </div>
+    </MainLayout>
   );
 }

@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - "rules/*.yml"
+
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # NVIDIA DCGM Exporter - GPU 指标
+  - job_name: 'dcgm-exporter'
+    static_configs:
+      - targets: ['dcgm-exporter:9400']
+    scrape_interval: 10s
+    metrics_path: /metrics
+
+  # Triton Inference Server 指标
+  - job_name: 'triton-server'
+    static_configs:
+      - targets: ['triton-server:8002']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Ollama LLM 服务
+  - job_name: 'ollama'
+    static_configs:
+      - targets: ['ollama:11434']
+    scrape_interval: 30s
+    metrics_path: /metrics

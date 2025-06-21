@@ -1,0 +1,16 @@
+# GPUStack指标数据源配置
+# 配置GPUStack的指标导出器作为Grafana的数据源
+apiVersion: 1
+
+datasources:
+  - name: GPUStack-Metrics
+    type: prometheus
+    access: proxy
+    url: http://gpustack:10151
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: "5s"
+      queryTimeout: "60s"
+      httpMethod: "GET"
+    version: 1
