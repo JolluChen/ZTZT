@@ -159,19 +159,25 @@ services:
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - GPUSTACK_PORT=8080
+      - GPUSTACK_PORT=18085
       - GPUSTACK_HOST=0.0.0.0
     ports:
-      - "8080:8080"      # GPUStack 管理界面
+      - "18085:18085"      # GPUStack 管理界面
+      - "40002:40002"      # vLLM 模型服务
     volumes:
       - ../data/gpustack:/var/lib/gpustack
       - /var/run/docker.sock:/var/run/docker.sock
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidia1:/dev/nvidia1
+      - /dev/nvidia2:/dev/nvidia2
+      - /dev/nvidia3:/dev/nvidia3
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+    shm_size: 4g
+    ulimits:
+      memlock: -1
+      stack: 67108864
     networks:
       - ai_platform_network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
