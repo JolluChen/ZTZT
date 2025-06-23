@@ -218,7 +218,7 @@ if [ "$SETUP_DIFY" = true ]; then
         echo -e "${YELLOW}⚠️ 由于缺少必要镜像，跳过 Dify 环境配置${NC}"
     else
         # 检查 Dify 源码
-        DIFY_REPO_PATH="/home/lsyzt/ZTZT/dify-repo"
+        DIFY_REPO_PATH="/home/lsyzt/ZTZT/dify"
         if [ ! -d "$DIFY_REPO_PATH" ]; then
             echo -e "${YELLOW}⚠️  Dify 源码目录不存在: $DIFY_REPO_PATH${NC}"
             echo -e "${BLUE}尝试从预构建镜像获取 Dify 服务...${NC}"
