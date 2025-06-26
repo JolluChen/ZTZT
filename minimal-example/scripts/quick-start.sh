@@ -169,7 +169,7 @@ check_and_cleanup_port 3000 "Next.js前端"
 
 # 如果启用 Dify，检查 Dify 端口
 if [ "$ENABLE_DIFY" = true ]; then
-    check_and_cleanup_port 8001 "Dify服务"
+    check_and_cleanup_port 8080 "Dify服务"
 fi
 
 # 启动 Docker 服务
@@ -257,8 +257,8 @@ echo -e "${GREEN}📊 Grafana监控: http://192.168.110.88:3002${NC}"
 
 # 如果启用了 Dify，显示 Dify 相关地址
 if [ "$ENABLE_DIFY" = true ]; then
-    echo -e "${GREEN}🤖 Dify 控制台: http://192.168.110.88:8001${NC}"
-    echo -e "${GREEN}🔗 Dify API: http://192.168.110.88:8001/v1${NC}"
+    echo -e "${GREEN}🤖 Dify 控制台: http://192.168.110.88:8080${NC}"
+    echo -e "${GREEN}🔗 Dify API: http://192.168.110.88:8080/v1${NC}"
 fi
 
 echo

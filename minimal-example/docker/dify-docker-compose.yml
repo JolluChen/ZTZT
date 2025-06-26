@@ -2,12 +2,12 @@ version: '3.8'
 
 x-shared-env: &shared-api-worker-env
   # Dify Core API Configuration
-  CONSOLE_API_URL: ${DIFY_CONSOLE_API_URL:-http://localhost:8001}
-  CONSOLE_WEB_URL: ${DIFY_CONSOLE_WEB_URL:-http://localhost:8001}
-  SERVICE_API_URL: ${DIFY_SERVICE_API_URL:-http://localhost:8001}
-  APP_API_URL: ${DIFY_APP_API_URL:-http://localhost:8001}
-  APP_WEB_URL: ${DIFY_APP_WEB_URL:-http://localhost:8001}
-  FILES_URL: ${DIFY_FILES_URL:-http://localhost:8001}
+  CONSOLE_API_URL: http://192.168.110.88:8080
+  CONSOLE_WEB_URL: http://192.168.110.88:8080
+  SERVICE_API_URL: http://192.168.110.88:8080/api
+  APP_API_URL: http://192.168.110.88:8080/api
+  APP_WEB_URL: http://192.168.110.88:8080
+  FILES_URL: http://192.168.110.88:8080/files
   
   # Debug and Logging
   LOG_LEVEL: ${DIFY_LOG_LEVEL:-INFO}
@@ -17,8 +17,14 @@ x-shared-env: &shared-api-worker-env
   
   # Security
   SECRET_KEY: ${DIFY_SECRET_KEY:-sk-ai-platform-dify-integration-2024}
-  INIT_PASSWORD: ${DIFY_INIT_PASSWORD:-}
+  INIT_PASSWORD: ${DIFY_INIT_PASSWORD:-admin123456}
   DEPLOY_ENV: ${DIFY_DEPLOY_ENV:-DEVELOPMENT}
+  # 完全禁用管理员访问码检查
+  ENABLE_ADMIN_ACCESS_CODE: false
+  ADMIN_ACCESS_CODE_CHECK_ENABLED: false
+  CONSOLE_ADMIN_ACCESS_CODE_CHECK: false
+  SKIP_CONSOLE_ADMIN_ACCESS_CODE: true
+  SYSTEM_INITIALIZED: true
   
   # Database Configuration (使用共享的 PostgreSQL)
   DB_USERNAME: ${DIFY_POSTGRES_USER:-ai_user}
@@ -67,6 +73,7 @@ services:
     environment:
       <<: *shared-api-worker-env
       MODE: api
+      # 移除管理员访问码设置，使用环境变量控制
     volumes:
       - dify_app_storage:/app/storage
     networks:
@@ -81,8 +88,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    profiles:
-      - dify
 
   # Dify Worker (Background Tasks)
   dify-worker:
@@ -92,6 +97,7 @@ services:
     environment:
       <<: *shared-api-worker-env
       MODE: worker
+      # 移除管理员访问码设置，使用环境变量控制
     volumes:
       - dify_app_storage:/app/storage
     networks:
@@ -102,27 +108,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    profiles:
-      - dify
 
-  # Dify Web Console (直接暴露端口，不使用 nginx 代理)
-  dify-web-direct:
-    image: ai-platform-dify-web:latest
-    container_name: ai_platform_dify_web_direct
-    restart: unless-stopped
-    ports:
-      - "8001:3000"
-    environment:
-      EDITION: SELF_HOSTED
-      CONSOLE_API_URL: http://192.168.110.88:5001
-      APP_API_URL: http://192.168.110.88:5001
-      SENTRY_DSN: ${DIFY_SENTRY_DSN:-}
+  # Dify Web Console
+  dify-web:
+    image: langgenius/dify-web:0.6.13
+    restart: always
     depends_on:
       - dify-api
+    environment:
+      # 修复路径重复问题 - 不包含 /console/api 路径
+      - CONSOLE_API_URL=http://192.168.110.88:8080
+      - APP_API_URL=http://192.168.110.88:8080/v1
+      - MARKETPLACE_API_URL=https://marketplace.dify.ai
     networks:
       - ai_platform_network
-    profiles:
-      - dify
+
+  dify-nginx:
+    image: nginx:1.25
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./dify-nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - dify-api
+      - dify-web
+    networks:
+      - ai_platform_network
 
 volumes:
   dify_app_storage:

@@ -144,6 +144,7 @@ const InstallForm = () => {
                   <input
                     {...register('password')}
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     placeholder={t('login.passwordPlaceholder') || ''}
                     className={'w-full appearance-none rounded-md border border-transparent bg-components-input-bg-normal py-[7px] pl-2 text-components-input-text-filled caret-primary-600 outline-none placeholder:text-components-input-text-placeholder hover:border-components-input-border-hover hover:bg-components-input-bg-hover focus:border-components-input-border-active focus:bg-components-input-bg-active focus:shadow-xs'}
                   />

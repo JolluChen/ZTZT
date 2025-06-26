@@ -233,4 +233,5 @@ keys/
 certs/
 *.pem
 *.key
-*.crt
+*.crtdify/docker/volumes/
+*.rdb

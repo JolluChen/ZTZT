@@ -98,10 +98,10 @@ if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
     lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
 fi
 
-# 检查并清理8001端口 (Dify)
-if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo -e "${YELLOW}清理端口8001上的进程...${NC}"
-    lsof -ti:8001 | xargs -r kill -9 2>/dev/null || true
+# 检查并清理8080端口 (Dify)
+if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}清理端口8080上的进程...${NC}"
+    lsof -ti:8080 | xargs -r kill -9 2>/dev/null || true
 fi
 
 echo

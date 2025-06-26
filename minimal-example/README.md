@@ -183,7 +183,8 @@ minimal-example/
 ├── docker/                      # Docker 配置
 │   ├── docker-compose.yml       # 基础服务配置
 │   ├── dify-docker-compose.yml  # Dify 服务配置
-│   ├── dify-nginx.conf          # Dify Nginx 配置
+│   ├── ai-platform-nginx.conf   # 🆕 AI中台统一入口配置 (端口80)
+│   ├── dify-nginx.conf          # Dify Nginx 配置 (端口8080)
 │   └── docker-compose.offline.yml # 离线监控配置
 ├── scripts/                     # 核心脚本目录
 │   ├── setup-environment.sh     # 环境配置脚本（一次性）
@@ -196,6 +197,7 @@ minimal-example/
 ├── logs/                        # 服务日志
 ├── data/                        # 数据目录
 ├── docs/                        # 详细文档
+│   ├── PORT_CONFLICT_RESOLUTION.md  # 🆕 端口冲突解决方案
 │   └── environment-config.md    # 🆕 环境配置详细说明
 ├── .env.development             # 🆕 开发环境配置模板
 ├── .env.production              # 🆕 生产环境配置模板
@@ -251,9 +253,16 @@ minimal-example/
 
 | 服务 | 开发环境地址 | 生产环境地址 | 账号 | 密码 | 说明 |
 |------|-------------|-------------|------|------|------|
-| AI中台前端 | http://localhost:3000 | http://192.168.110.88:3000 | admin@example.com | admin123 | Next.js 前端界面 |
-| AI中台后端 API | http://localhost:8000 | http://192.168.110.88:8000 | - | - | Django REST API |
-| Dify AI平台 | http://localhost:8001 | http://192.168.110.88:8001 | 需初次设置 | 需初次设置 | Dify AI应用构建平台 |
+| **AI中台统一入口** | **http://localhost:80** | **http://192.168.110.88:80** | admin@example.com | admin123 | **🆕 统一访问入口 (推荐)** |
+| AI中台前端 (直接) | http://localhost:3000 | http://192.168.110.88:3000 | admin@example.com | admin123 | Next.js 前端界面 |
+| AI中台后端 (直接) | http://localhost:8000 | http://192.168.110.88:8000 | - | - | Django REST API |
+| **Dify AI平台** | **http://localhost:8080** | **http://192.168.110.88:8080** | 需初次设置 | 需初次设置 | **🆕 端口调整 - Dify AI应用构建平台** |
+
+> **🎯 端口冲突解决方案**: 
+> - **端口80** (AI中台统一入口): 通过nginx反向代理提供前端和后端的统一访问
+> - **端口8080** (Dify平台): 从原来的端口80调整为8080，避免端口冲突
+> - **直接访问**: 仍可通过原端口(3000/8000)直接访问各服务
+> - **详细说明**: 参见 [端口冲突解决方案文档](docs/PORT_CONFLICT_RESOLUTION.md)
 
 > **🔧 环境切换提示**: 
 > - 使用 `./scripts/env-config.sh dev` 自动配置开发环境地址
@@ -261,9 +270,10 @@ minimal-example/
 > - 切换环境后需重启服务: `./stop.sh && ./quick-start.sh`
 
 > **🔧 Dify 初始化说明**: 
-> - 首次访问 Dify 平台时，需要通过对应环境的地址/install 完成初始设置
+> - 首次访问 Dify 平台时，需要通过对应环境的地址:8080/install 完成初始设置
 > - 设置管理员账号和密码后，即可正常使用 Dify 的所有功能
 > - 建议设置账号为: admin@example.com，密码请自定义
+> - 详细端口管理说明参见: [端口冲突解决方案文档](docs/PORT_CONFLICT_RESOLUTION.md)
 
 ### 数据存储服务
 
@@ -1008,5 +1018,6 @@ tail -f logs/backend.log logs/frontend.log
 ```
 
 ---
-*最后更新: 2024年12月18日*
+*最后更新: 2025年6月26日*
+*版本: v2025.6 - 端口冲突解决 + Dify集成 + 环境管理系统*
 *项目地址: AI中台最小化示例*
